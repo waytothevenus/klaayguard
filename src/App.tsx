@@ -9,6 +9,8 @@ function App() {
   const [error, setError] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   // Step 1: Check if user is authenticated
   async function checkAuthentication() {
@@ -31,8 +33,28 @@ function App() {
     }
   }
 
+  const validateInputs = () => {
+    let isValid = true;
+    if (!username) {
+      setUsernameError("Username is required.");
+      isValid = false;
+    } else {
+      setUsernameError("");
+    }
+
+    if (!password) {
+      setPasswordError("Password is required.");
+      isValid = false;
+    } else {
+      setPasswordError("");
+    }
+
+    return isValid;
+  };
+
   // Step 2: Authenticate user
   async function authenticateUser() {
+    if (!validateInputs()) return;
     try {
       const requestBody = {
         data: {
@@ -174,8 +196,13 @@ function App() {
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className={`mt-1 block w-full px-4 py-2 border ${
+                usernameError ? "border-red-500" : "border-gray-300"
+              } rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
             />
+            {usernameError && (
+              <p className="text-red-500 text-sm mt-1">{usernameError}</p>
+            )}
           </div>
           <div className="mb-6">
             <label
@@ -190,8 +217,13 @@ function App() {
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className={`mt-1 block w-full px-4 py-2 border ${
+                passwordError ? "border-red-500" : "border-gray-300"
+              } rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
             />
+            {passwordError && (
+              <p className="text-red-500 text-sm mt-1">{passwordError}</p>
+            )}
           </div>
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <button

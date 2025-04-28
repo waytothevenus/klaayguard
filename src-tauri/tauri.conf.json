@@ -5,7 +5,7 @@
   "identifier": "com.klaay.app",
   "build": {
     "beforeDevCommand": "yarn dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://192.168.141.160:1420",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
   },
