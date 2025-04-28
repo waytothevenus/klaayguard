@@ -34,17 +34,47 @@ function App() {
   // Step 2: Authenticate user
   async function authenticateUser() {
     try {
+      const requestBody = {
+        data: {
+          type: "authorization",
+          attributes: {
+            email: username,
+            password: password,
+          },
+          relationships: {
+            account: {
+              data: {
+                type: "account",
+                id: 264178000,
+              },
+            },
+          },
+        },
+      };
+
       const response = await fetch(`https://api.klaay.dev/authenticate`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/vnd.api+json",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setJwtToken(data.token);
+        const responseData = await response.json();
+
+        // Extract token from the response
+        const token = responseData.data.attributes.token;
+        setJwtToken(token);
+        localStorage.setItem("jwtToken", token);
+
+        // Extract user and account details for logging or further use
+        const user = responseData.data.relationships.user.data;
+        const account = responseData.data.relationships.account.data;
+
+        console.log("Authenticated User:", user);
+        console.log("Authenticated Account:", account);
+
         setIsSignedIn(true);
         setError("");
       } else {
