@@ -7,10 +7,35 @@ function App() {
   const [jwtToken, setJwtToken] = useState("");
   const [config, setConfig] = useState(null);
   const [error, setError] = useState("");
+  const [osqueryInstalled, setOsqueryInstalled] = useState<boolean | null>(
+    null
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  useEffect(() => {
+    checkInstallation();
+  }, []);
+
+  const checkInstallation = async () => {
+    try {
+      const installed = await invoke<boolean>("check_osquery");
+      setOsqueryInstalled(installed);
+    } catch (err) {
+      setError(`Error checking installation: ${err}`);
+    }
+  };
+
+  const handleInstall = async () => {
+    try {
+      await invoke("install_osquery");
+      await checkInstallation();
+    } catch (err) {
+      setError(`Installation failed: ${err}`);
+    }
+  };
 
   // Step 1: Check if user is authenticated
   async function checkAuthentication() {
@@ -180,6 +205,20 @@ function App() {
       checkAuthentication();
     }
   });
+
+  if (osqueryInstalled === null) {
+    return <div>Checking osquery installation...</div>;
+  }
+
+  if (!osqueryInstalled) {
+    return (
+      <div>
+        <h2>Osquery not installed</h2>
+        <button onClick={handleInstall}>Install Osquery</button>
+        {error && <div className="error">{error}</div>}
+      </div>
+    );
+  }
 
   return (
     <main className="flex items-center justify-center min-h-screen bg-gray-100">
