@@ -121,7 +121,9 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setConfig(data);
-        await invoke("process_config", { config: data });
+        const tableNames = data.data.map((item: any) => item.id);
+        console.log("Request Query for these tables: ", tableNames);
+        await execute_query(tableNames);
       } else {
         console.error("Failed to fetch configuration.");
       }
@@ -147,6 +149,15 @@ function App() {
       }
     } catch (err) {
       console.error("Error posting data to API:", err);
+    }
+  }
+
+  async function execute_query(tableNames: string[]) {
+    try {
+      const response = await invoke("execute_query", { tableNames });
+      console.log("Query executed successfully:", response);
+    } catch (error) {
+      console.error("Error executing query:", error);
     }
   }
 
