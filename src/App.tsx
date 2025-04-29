@@ -7,10 +7,35 @@ function App() {
   const [jwtToken, setJwtToken] = useState("");
   const [config, setConfig] = useState(null);
   const [error, setError] = useState("");
+  const [osqueryInstalled, setOsqueryInstalled] = useState<boolean | null>(
+    null
+  );
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  useEffect(() => {
+    checkInstallation();
+  }, []);
+
+  const checkInstallation = async () => {
+    try {
+      const installed = await invoke<boolean>("check_osquery");
+      setOsqueryInstalled(installed);
+    } catch (err) {
+      setError(`Error checking installation: ${err}`);
+    }
+  };
+
+  const handleInstall = async () => {
+    try {
+      await invoke("install_osquery");
+      await checkInstallation();
+    } catch (err) {
+      setError(`Installation failed: ${err}`);
+    }
+  };
 
   // Step 1: Check if user is authenticated
   async function checkAuthentication() {
@@ -121,7 +146,9 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         setConfig(data);
-        await invoke("process_config", { config: data });
+        const tableNames = data.data.map((item: any) => item.id);
+        console.log("Request Query for these tables: ", tableNames);
+        await execute_query(tableNames);
       } else {
         console.error("Failed to fetch configuration.");
       }
@@ -150,6 +177,15 @@ function App() {
     }
   }
 
+  async function execute_query(tableNames: string[]) {
+    try {
+      const response = await invoke("execute_query", { tableNames });
+      console.log("Query executed successfully:", response);
+    } catch (error) {
+      console.error("Error executing query:", error);
+    }
+  }
+
   useEffect(() => {
     if (isSignedIn) {
       fetchConfiguration();
@@ -169,6 +205,20 @@ function App() {
       checkAuthentication();
     }
   });
+
+  if (osqueryInstalled === null) {
+    return <div>Checking osquery installation...</div>;
+  }
+
+  if (!osqueryInstalled) {
+    return (
+      <div>
+        <h2>Osquery not installed</h2>
+        <button onClick={handleInstall}>Install Osquery</button>
+        {error && <div className="error">{error}</div>}
+      </div>
+    );
+  }
 
   return (
     <main className="flex items-center justify-center min-h-screen bg-gray-100">
