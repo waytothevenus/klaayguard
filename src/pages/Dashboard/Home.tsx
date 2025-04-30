@@ -19,7 +19,17 @@ export const Home = () => {
     data: ConfigData[];
   }
 
+  type DeepRecord =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | DeepRecord[]
+    | { [key: string]: DeepRecord };
+
   const [config, setConfig] = useState<Config | null>(null);
+  const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -87,7 +97,7 @@ export const Home = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ data: "osquery results" }),
+        body: JSON.stringify({ data: queryResult }),
       });
 
       if (!response.ok) {
@@ -100,8 +110,15 @@ export const Home = () => {
 
   async function execute_query(tableNames: string[]) {
     try {
-      const response = await invoke("execute_query", { tableNames });
-      console.log("Query executed successfully:", response);
+      const response = await invoke<DeepRecord | null>("execute_query", {
+        tableNames,
+      });
+      if (!response) {
+        setError("No data received from the query.");
+        return;
+      }
+      setQueryResult(response);
+      console.log("Query executed successfully:", queryResult);
     } catch (error) {
       console.error("Error executing query:", error);
     }
@@ -132,28 +149,93 @@ export const Home = () => {
       ) : osqueryInstalled ? (
         <>
           <p className="text-green-600 mb-4">Osquery is installed.</p>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">
-            Configuration
-          </h2>
-          <table className="table-auto w-full bg-white shadow-md rounded-lg mb-6">
-            <thead>
-              <tr className="bg-gray-200 text-gray-700">
-                <th className="px-4 py-2">Type</th>
-                <th className="px-4 py-2">ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {config?.data?.map((item, index: number) => (
-                <tr
-                  key={index}
-                  className={`${index % 2 === 0 ? "bg-gray-100" : "bg-white"}`}
-                >
-                  <td className="border px-4 py-2">{item.type}</td>
-                  <td className="border px-4 py-2">{item.id}</td>
+          <div className="overflow-x-auto bg-white shadow-md rounded-lg p-4 mb-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">
+              Configuration
+            </h2>
+            <table className="table-auto w-full bg-white shadow-md rounded-lg mb-6">
+              <thead>
+                <tr className="bg-gray-200 text-gray-700">
+                  <th className="px-4 py-2">Type</th>
+                  <th className="px-4 py-2">ID</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {config?.data?.map((item, index: number) => (
+                  <tr
+                    key={index}
+                    className={`${
+                      index % 2 === 0 ? "bg-gray-100" : "bg-white"
+                    }`}
+                  >
+                    <td className="border px-4 py-2">{item.type}</td>
+                    <td className="border px-4 py-2">{item.id}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="overflow-x-auto bg-white shadow-md rounded-lg p-4 mb-6">
+            <h2 className="text-xl font-semibold text-gray-700 mb-2">
+              Query Result
+            </h2>
+            {queryResult && typeof queryResult === "object" ? (
+              Object.entries(queryResult).map(([tableName, tableData]) => (
+                <div key={tableName} className="mb-8">
+                  <h3 className="text-lg font-medium text-gray-800 mb-3 capitalize">
+                    {tableName.replace(/_/g, " ")}
+                  </h3>
+                  {Array.isArray(tableData) && tableData.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            {tableData[0] &&
+                              Object.keys(tableData[0]).map((key) => (
+                                <th
+                                  key={key}
+                                  scope="col"
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                  {key}
+                                </th>
+                              ))}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {tableData.map((row, rowIndex) => (
+                            <tr key={rowIndex}>
+                              {row &&
+                                Object.values(row).map((value, colIndex) => (
+                                  <td
+                                    key={colIndex}
+                                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                                  >
+                                    {typeof value === "object" ? (
+                                      <pre className="text-xs">
+                                        {JSON.stringify(value, null, 2)}
+                                      </pre>
+                                    ) : (
+                                      String(value)
+                                    )}
+                                  </td>
+                                ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 italic">No data available</p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <pre className="whitespace-pre-wrap">
+                {JSON.stringify(queryResult, null, 2)}
+              </pre>
+            )}
+          </div>
         </>
       ) : (
         <button
