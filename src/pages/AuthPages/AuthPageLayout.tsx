@@ -17,10 +17,7 @@ export default function AuthLayout({
             <GridShape />
             <div className="flex flex-col space-y-10 items-center max-w-xs">
               <p className="text-center text-4xl text-white dark:text-white">
-                Datalyst
-              </p>
-              <p className="text-center text-gray-400 dark:text-white/60">
-                Free and Open-Source Tailwind CSS Admin Dashboard Template
+                Klaay Guard
               </p>
             </div>
           </div>

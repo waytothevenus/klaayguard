@@ -2,13 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import SignIn from "./pages/AuthPages/SignIn";
 import { Home } from "./pages/Dashboard/Home";
 import { AuthProvider } from "./context/AuthContext";
-import {ToastContainer} from "react-toastify";
+import { ToastContainer } from "react-toastify";
 
-
-export default function App(){
+export default function App() {
   return (
     <BrowserRouter>
-      <ToastContainer/>
+      <ToastContainer />
       <AuthProvider>
         <Routes>
           <Route path="/" element={<Navigate to="/home" />} />
@@ -17,5 +16,5 @@ export default function App(){
         </Routes>
       </AuthProvider>
     </BrowserRouter>
-  )
+  );
 }

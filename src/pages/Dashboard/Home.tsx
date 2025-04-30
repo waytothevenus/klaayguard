@@ -10,7 +10,16 @@ export const Home = () => {
   const [osqueryInstalled, setOsqueryInstalled] = useState<boolean | null>(
     null
   );
-  const [config, setConfig] = useState<any>(null);
+  interface ConfigData {
+    type: string;
+    id: string;
+  }
+
+  interface Config {
+    data: ConfigData[];
+  }
+
+  const [config, setConfig] = useState<Config | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -56,9 +65,9 @@ export const Home = () => {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as Config;
         setConfig(data);
-        const tableNames = data.data.map((item: any) => item.id);
+        const tableNames = data.data.map((item) => item.id);
         console.log("Request Query for these tables: ", tableNames);
         await execute_query(tableNames);
       } else {
@@ -111,7 +120,7 @@ export const Home = () => {
         className="absolute top-4 right-4 text-gray-600 hover:text-red-600"
         title="Logout"
       >
-        <CloseIcon size={24} />
+        <CloseIcon />
       </button>
 
       <h1 className="text-2xl font-bold text-gray-800 mb-4">
@@ -134,7 +143,7 @@ export const Home = () => {
               </tr>
             </thead>
             <tbody>
-              {config?.data?.map((item: any, index: number) => (
+              {config?.data?.map((item, index: number) => (
                 <tr
                   key={index}
                   className={`${index % 2 === 0 ? "bg-gray-100" : "bg-white"}`}
