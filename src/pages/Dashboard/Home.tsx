@@ -24,17 +24,17 @@ export const Home = () => {
 
   useEffect(() => {
     checkInstallation();
-    if(osqueryInstalled){
+  }, []);
 
-        fetchConfiguration();
-        
-        const interval = setInterval(() => {
-            fetchConfiguration();
-            postDataToApi();
-        }, 15 * 60 * 1000); // 15 minutes
-        
-        return () => clearInterval(interval);
-    }
+  useEffect(() => {
+    fetchConfiguration();
+
+    const interval = setInterval(() => {
+      fetchConfiguration();
+      postDataToApi();
+    }, 15 * 60 * 1000); // 15 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   const checkInstallation = async () => {
@@ -65,7 +65,7 @@ export const Home = () => {
       });
 
       if (response.ok) {
-        const data = await response.json() as Config;
+        const data = (await response.json()) as Config;
         setConfig(data);
         const tableNames = data.data.map((item) => item.id);
         console.log("Request Query for these tables: ", tableNames);

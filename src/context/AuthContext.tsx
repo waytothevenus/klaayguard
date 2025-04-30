@@ -94,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("token");
+    const savedToken = localStorage.getItem("jwtToken");
     const currentPath = window.location.pathname;
     if (savedToken) {
       setToken(savedToken);
@@ -109,11 +109,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-
   const logout = () => {
     setToken(null);
     setIsAuthenticated(false);
-    localStorage.removeItem("token");
+    localStorage.removeItem("jwtToken");
     navigate("/signin");
   };
 
