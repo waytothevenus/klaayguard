@@ -91,13 +91,25 @@ export const Home = () => {
   // Step 4: Post data to API
   async function postDataToApi() {
     try {
+      const formattedData = Object.entries(queryResult || {}).map(
+        ([type, entries]) => {
+          if (Array.isArray(entries) && entries.length !== 0) {
+            return entries.map((entry: DeepRecord) => {
+              return {
+                type,
+                attributes: entry,
+              };
+            });
+          }
+        }
+      );
       const response = await fetch(`https://api.klaay.dev/klaayguard/data`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ data: queryResult }),
+        body: JSON.stringify(formattedData),
       });
 
       if (!response.ok) {
@@ -126,7 +138,7 @@ export const Home = () => {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/signin");
   };
 
   return (
