@@ -1,7 +1,52 @@
-# Tauri + React + Typescript
+# KlaayGuard
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-FFC131.svg?logo=tauri)](https://tauri.app)
 
-## Recommended IDE Setup
+A lightweight desktop application built with Tauri and [your tech stack, e.g., React/Svelte/Vue].
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+![App Screenshot](./screenshot.png) *(Optional screenshot)*
+
+## Features
+- Feature 1 (e.g., Cross-platform support)
+- Feature 2 (e.g., Offline capability)
+- Feature 3 (e.g., Native system integrations)
+
+## Prerequisites
+- [Node.js](https://nodejs.org/) (v22 recommended)
+- [Rust](https://www.rust-lang.org/) (latest stable)
+- [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
+- [Tauri Prerequisites](https://v1.tauri.app/v1/guides/getting-started/prerequisites/)
+
+## Quick Start
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/klaayinc/klaayguard.git
+   cd klaayguard
+
+2. Install Dependencies:
+    ```bash 
+    npm install  # or pnpm/yarn
+
+3. Run in development
+    ```bash
+    npm run tauri dev # or yarn tauri dev
+
+4. Build the production:
+    ```bash
+    npm run tauri build # or yarn tauri dev
+
+Project Structure
+
+    /
+    ├── src-tauri/      # Tauri backend (Rust)
+    ├── src/            # Frontend (e.g., React/Vue files)
+    ├── public/         # Static assets
+    └── ...             # Other config files
+
+Build for different platforms
+
+    Platform	Command
+    ```bash
+    Windows	    npm run tauri build -- --target x86_64-pc-windows-msvc
+    macOS	    npm run tauri build -- --target aarch64-apple-darwin
+    Linux	    npm run tauri build -- --target x86_64-unknown-linux-gnu
