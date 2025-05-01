@@ -95,17 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const savedToken = localStorage.getItem("jwtToken");
+
     const currentPath = window.location.pathname;
     if (savedToken) {
+      console.log("savedToken", savedToken);
       setToken(savedToken);
       setIsAuthenticated(true);
-      if (currentPath == "/signin" || currentPath == "/signup") {
+      if (currentPath == "/signin") {
         navigate("/home");
       }
     } else {
-      if (currentPath !== "/signup" && currentPath !== "/reset-password") {
         navigate("/signin");
-      }
     }
   }, []);
 
