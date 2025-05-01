@@ -10,6 +10,7 @@ export default function App() {
       <ToastContainer />
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<SignIn />} />
           <Route path="/home" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
         </Routes>

@@ -32,6 +32,8 @@ export const Home = () => {
   const [config, setConfig] = useState<Config | null>(null);
   const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipText, setTooltipText] = useState("");
 
   useEffect(() => {
     if (!token) {
@@ -160,12 +162,21 @@ export const Home = () => {
       {/* Logout Button */}
       <button
         onClick={handleLogout}
+        onMouseEnter={() => {
+          setShowTooltip(true);
+          setTooltipText("Logout");
+        }}
+        onMouseLeave={() => setShowTooltip(false)}
         className="absolute top-4 right-4 text-gray-600 hover:text-red-600"
         title="Logout"
       >
         <HiOutlineLogout />
       </button>
-
+      {showTooltip && (
+        <div className="absolute top-12 right-0 bg-gray-800 text-white text-xs rounded-md px-2 py-1 shadow-lg">
+          {tooltipText}
+        </div>
+      )}
       <h1 className="text-2xl font-bold text-gray-800 mb-8 text-center">
         KlaayGuard Dashboard
       </h1>
@@ -173,7 +184,7 @@ export const Home = () => {
       {osqueryInstalled === null ? (
         <p>Checking osquery installation...</p>
       ) : osqueryInstalled === false && isInstalling ? (
-        <p className = "text-center">Installing osquery...</p>
+        <p className="text-center">Installing osquery...</p>
       ) : osqueryInstalled ? (
         <>
           <div className="overflow-x-auto bg-white shadow-md rounded-lg p-4 mb-6">
