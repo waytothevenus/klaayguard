@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-        working-directory: node-gui-x # Set working directory to node-gui-x
+        working-directory: klaayguard # Set working directory to klaayguard
 
       - name: setup node
         uses: actions/setup-node@v4
