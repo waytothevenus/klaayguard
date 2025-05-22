@@ -16,7 +16,6 @@ async fn execute_query(table_names: Vec<String>) -> Result<HashMap<String, Value
     use std::os::windows::process::CommandExt;
     use serde_json::Value;
     use std::collections::HashMap;
-    use std::process::{Command, Stdio};
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
