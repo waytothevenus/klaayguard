@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "../../context/AuthContext";
-import { HiOutlineLogout } from "react-icons/hi";
+import { CloseIcon } from "../../icons";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -10,7 +10,8 @@ export const Home = () => {
   const [osqueryInstalled, setOsqueryInstalled] = useState<boolean | null>(
     null
   );
-  const [isInstalling, setIsInstalling] = useState(false);
+
+  const [isOsQueryInstalling, setIsOsQueryInstalling] = useState(false);
   interface ConfigData {
     type: string;
     id: string;
@@ -32,38 +33,27 @@ export const Home = () => {
   const [config, setConfig] = useState<Config | null>(null);
   const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipText, setTooltipText] = useState("");
 
   useEffect(() => {
-    if (!token) {
-      console.error("Token is not available. Redirecting to sign-in.");
-      navigate("/signin");
-    } else {
-      checkInstallation();
-    }
-  }, [token]);
+    checkInstallation();
+  }, []);
 
   useEffect(() => {
-    if (token) {
+    fetchConfiguration();
+
+    const interval = setInterval(() => {
       fetchConfiguration();
+      postDataToApi();
+    }, 15 * 60 * 1000); // 15 minutes
 
-      const interval = setInterval(() => {
-        fetchConfiguration();
-        postDataToApi();
-      }, 15 * 60 * 1000); // 15 minutes
-
-      return () => clearInterval(interval);
-    }
-  }, [token]);
+    return () => clearInterval(interval);
+  }, []);
 
   const checkInstallation = async () => {
     try {
       const installed = await invoke<boolean>("check_osquery");
       setOsqueryInstalled(installed);
-      if (installed) {
-        setIsInstalling(false);
-      }
+      setIsOsQueryInstalling(false);
     } catch (err) {
       setError(`Error checking installation: ${err}`);
     }
@@ -71,13 +61,11 @@ export const Home = () => {
 
   const handleInstall = async () => {
     try {
-      setIsInstalling(true);
+      setIsOsQueryInstalling(true);
       await invoke("install_osquery");
       await checkInstallation();
     } catch (err) {
       setError(`Installation failed: ${err}`);
-    } finally {
-      setIsInstalling(false);
     }
   };
 
@@ -162,31 +150,25 @@ export const Home = () => {
       {/* Logout Button */}
       <button
         onClick={handleLogout}
-        onMouseEnter={() => {
-          setShowTooltip(true);
-          setTooltipText("Logout");
-        }}
-        onMouseLeave={() => setShowTooltip(false)}
         className="absolute top-4 right-4 text-gray-600 hover:text-red-600"
         title="Logout"
       >
-        <HiOutlineLogout />
+        <CloseIcon />
       </button>
-      {showTooltip && (
-        <div className="absolute top-12 right-0 bg-gray-800 text-white text-xs rounded-md px-2 py-1 shadow-lg">
-          {tooltipText}
-        </div>
-      )}
-      <h1 className="text-2xl font-bold text-gray-800 mb-8 text-center">
-        KlaayGuard Dashboard
+
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">
+        Welcome to the Dashboard
       </h1>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {osqueryInstalled === null ? (
-        <p>Checking osquery installation...</p>
-      ) : osqueryInstalled === false && isInstalling ? (
-        <p className="text-center">Installing osquery...</p>
+        isOsQueryInstalling ? (
+          <p className="text-yellow-600 mb-4">Installing osquery...</p>
+        ) : (
+          <p>Checking osquery installation...</p>
+        )
       ) : osqueryInstalled ? (
         <>
+          <p className="text-green-600 mb-4">Osquery is installed.</p>
           <div className="overflow-x-auto bg-white shadow-md rounded-lg p-4 mb-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Configuration
@@ -276,17 +258,12 @@ export const Home = () => {
           </div>
         </>
       ) : (
-        <div className="text-center">
-          <p className="text-red-500 mb-4">
-            Osquery is not installed. Please install it to proceed.
-          </p>
-          <button
-            onClick={handleInstall}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Install Osquery
-          </button>
-        </div>
+        <button
+          onClick={handleInstall}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+        >
+          Install Osquery
+        </button>
       )}
     </div>
   );

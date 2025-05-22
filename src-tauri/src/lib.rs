@@ -1,31 +1,61 @@
 mod osquery;
-use osquery::{install, service::OsqueryService};
+use osquery::install;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    process::{Command, Stdio},
+};
 use tauri::{
-    Manager,
-    menu::{MenuItem, Menu},
+    menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
+    Manager,
 };
 
 #[tauri::command]
 async fn execute_query(table_names: Vec<String>) -> Result<HashMap<String, Value>, String> {
+    use std::os::windows::process::CommandExt;
+    use serde_json::Value;
+    use std::collections::HashMap;
+    use std::process::{Command, Stdio};
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
     let mut all_results = HashMap::new();
 
     for table_name in table_names {
-        let query = format!("SELECT * from {};", table_name);
-        let service = OsqueryService;
-        match service.query(&query) {
-            Ok(result) => {
-                let converted_result: Value = serde_json::to_value(result).map_err(|e| {
-                    format!("Failed to convert result for table {}: {}", table_name, e)
-                })?;
-                all_results.insert(table_name.to_string(), converted_result);
-            }
-            Err(e) => {
-                return Err(format!("Failed to query table {}: {}", table_name, e));
-            }
+        // Execute osquery command
+        let output = Command::new("osqueryi")
+            .args(&[
+                "--json",
+                &format!("SELECT * FROM {}", table_name),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| format!("Failed to run osquery: {}", e))?;
+        
+        if !output.status.success() {
+            let error_msg = String::from_utf8_lossy(&output.stderr);
+            return Err(format!(
+                "Osquery failed for table {}: {}",
+                table_name,
+                error_msg.trim()
+            ));
         }
+
+        let stdout_str = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Invalid UTF-8 output for table {}: {}", table_name, e))?;
+
+        let parsed_result: Value = serde_json::from_str(&stdout_str)
+            .map_err(|e| format!(
+                "Failed to parse JSON for table {} (content: '{}'): {}", 
+                table_name, 
+                stdout_str.trim(), 
+                e
+            ))?;
+
+        all_results.insert(table_name, parsed_result);
     }
 
     Ok(all_results)
@@ -49,7 +79,7 @@ pub fn run() {
             let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
             let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_i, &show_i, &hide_i])?;
-            TrayIconBuilder::new()             
+            TrayIconBuilder::new()
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -67,16 +97,14 @@ pub fn run() {
                     }
                     _ => {}
                 })
-                .on_tray_icon_event(|tray, event| match event{
-                    TrayIconEvent::Enter{..} => {
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::Enter { .. } => {
                         tray.set_tooltip(Some("Klaay Guard".to_string())).unwrap();
-                    },
-                    TrayIconEvent::Leave{..} => {
-                        tray.set_tooltip(Some("")).unwrap();
-                    },
-                    _ =>{
-                        
                     }
+                    TrayIconEvent::Leave { .. } => {
+                        tray.set_tooltip(Some("")).unwrap();
+                    }
+                    _ => {}
                 })
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
