@@ -49,19 +49,28 @@ pub fn is_osquery_installed() -> bool {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
         
-        Command::new("osqueryi")
-            .arg("--version")
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .is_ok()
+        // Combine multiple flags for maximum suppression
+        let flags = CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
+        
+        std::process::Command::new("where")  // First check if osqueryi exists in PATH
+            .arg("osqueryi")
+            .creation_flags(flags)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
     }
     
     #[cfg(not(target_os = "windows"))]
     {
-        Command::new("osqueryi")
-            .arg("--version")
-            .output()
-            .is_ok()
+        std::process::Command::new("which")
+            .arg("osqueryi")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
     }
 }

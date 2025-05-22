@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "../../context/AuthContext";
-import { CloseIcon } from "../../icons";
-
+import { MdLogout } from "react-icons/md";
 export const Home = () => {
   const navigate = useNavigate();
   const { token, logout } = useAuth();
   const [osqueryInstalled, setOsqueryInstalled] = useState<boolean | null>(
     null
   );
+
+  const [isOsQueryInstalling, setIsOsQueryInstalling] = useState(false);
   interface ConfigData {
     type: string;
     id: string;
@@ -37,20 +38,30 @@ export const Home = () => {
   }, []);
 
   useEffect(() => {
-    fetchConfiguration();
-
+    if (!osqueryInstalled) return;
     const interval = setInterval(() => {
       fetchConfiguration();
-      postDataToApi();
     }, 15 * 60 * 1000); // 15 minutes
-
     return () => clearInterval(interval);
-  }, []);
+  }, [osqueryInstalled]);
+
+  useEffect(() => {
+    if (osqueryInstalled) {
+      fetchConfiguration();
+    }
+  }, [osqueryInstalled]);
+
+  useEffect(() => {
+    if (queryResult) {
+      postDataToApi();
+    }
+  }, [queryResult]);
 
   const checkInstallation = async () => {
     try {
       const installed = await invoke<boolean>("check_osquery");
       setOsqueryInstalled(installed);
+      setIsOsQueryInstalling(false);
     } catch (err) {
       setError(`Error checking installation: ${err}`);
     }
@@ -58,6 +69,7 @@ export const Home = () => {
 
   const handleInstall = async () => {
     try {
+      setIsOsQueryInstalling(true);
       await invoke("install_osquery");
       await checkInstallation();
     } catch (err) {
@@ -91,25 +103,29 @@ export const Home = () => {
   // Step 4: Post data to API
   async function postDataToApi() {
     try {
-      const formattedData = Object.entries(queryResult || {}).map(
-        ([type, entries]) => {
-          if (Array.isArray(entries) && entries.length !== 0) {
-            return entries.map((entry: DeepRecord) => {
-              return {
+      console.log("Posting data to API...", { queryResult });
+      if (!queryResult) {
+        console.error("No data to post.");
+        return;
+      }
+      const formattedData = Object.entries(queryResult || {}).flatMap(
+        ([type, entries]) =>
+          Array.isArray(entries) && entries.length !== 0
+            ? entries.map((entry: DeepRecord) => ({
                 type,
                 attributes: entry,
-              };
-            });
-          }
-        }
+              }))
+            : []
       );
+
+      console.log("Formatted data to post:", formattedData);
       const response = await fetch(`https://api.klaay.dev/klaayguard/data`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formattedData),
+        body: JSON.stringify({ data: formattedData }),
       });
 
       if (!response.ok) {
@@ -130,7 +146,6 @@ export const Home = () => {
         return;
       }
       setQueryResult(response);
-      console.log("Query executed successfully:", queryResult);
     } catch (error) {
       console.error("Error executing query:", error);
     }
@@ -142,32 +157,33 @@ export const Home = () => {
   };
 
   return (
-    <div className="home relative p-6 bg-gray-100 min-h-screen">
+    <div className="home items-center relative p-6 bg-gray-100 min-h-screen">
       {/* Logout Button */}
       <button
         onClick={handleLogout}
         className="absolute top-4 right-4 text-gray-600 hover:text-red-600"
         title="Logout"
       >
-        <CloseIcon />
+        <MdLogout />
       </button>
 
-      <h1 className="text-2xl font-bold text-gray-800 mb-4">
-        Welcome to the Dashboard
+      <h1 className="text-2xl font-bold text-center text-gray-800 mb-4">
+        Welcome to the Klaay Guard
       </h1>
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      {osqueryInstalled === null ? (
+      {isOsQueryInstalling ? (
+        <p className="text-yellow-600 mb-4">Installing osquery...</p>
+      ) : osqueryInstalled === null ? (
         <p>Checking osquery installation...</p>
       ) : osqueryInstalled ? (
         <>
-          <p className="text-green-600 mb-4">Osquery is installed.</p>
           <div className="overflow-x-auto bg-white shadow-md rounded-lg p-4 mb-6">
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               Configuration
             </h2>
             <table className="table-auto w-full bg-white shadow-md rounded-lg mb-6">
-              <thead>
-                <tr className="bg-gray-200 text-gray-700">
+              <thead className="sticky top-0 z-10 bg-gray-200">
+                <tr className="text-gray-700">
                   <th className="px-4 py-2">Type</th>
                   <th className="px-4 py-2">ID</th>
                 </tr>
@@ -200,7 +216,7 @@ export const Home = () => {
                   {Array.isArray(tableData) && tableData.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                        <thead className="sticky top-0 z-10 bg-gray-50">
                           <tr>
                             {tableData[0] &&
                               Object.keys(tableData[0]).map((key) => (
@@ -221,12 +237,20 @@ export const Home = () => {
                                 Object.values(row).map((value, colIndex) => (
                                   <td
                                     key={colIndex}
-                                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
+                                    className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[300px] truncate"
+                                    title={
+                                      typeof value === "string"
+                                        ? value
+                                        : undefined
+                                    }
                                   >
                                     {typeof value === "object" ? (
-                                      <pre className="text-xs">
+                                      <pre className="text-xs max-w-[300px] overflow-x-auto">
                                         {JSON.stringify(value, null, 2)}
                                       </pre>
+                                    ) : typeof value === "string" &&
+                                      value.length > 100 ? (
+                                      <>{value.slice(0, 100)}...</>
                                     ) : (
                                       String(value)
                                     )}
@@ -250,12 +274,14 @@ export const Home = () => {
           </div>
         </>
       ) : (
-        <button
-          onClick={handleInstall}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-        >
-          Install Osquery
-        </button>
+        <div className="flex justify-center items-center min-h-[200px]">
+          <button
+            onClick={handleInstall}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Install Osquery
+          </button>
+        </div>
       )}
     </div>
   );
