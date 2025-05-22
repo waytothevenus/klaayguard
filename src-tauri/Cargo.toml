@@ -28,3 +28,15 @@ log = "0.4.27"
 tauri-plugin-shell = "2"
 uuid = { version = "1.16.0", features = ["v4"] }
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase", "processenv"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.26"  # For Unix-specific system calls if needed
+
+# Enable all Tauri features needed for each platform
+[features]
+default = []
+
+
+

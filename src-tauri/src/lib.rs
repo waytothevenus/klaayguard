@@ -3,7 +3,6 @@ use osquery::install;
 use serde_json::Value;
 use std::{
     collections::HashMap,
-    process::{Command, Stdio},
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -13,27 +12,35 @@ use tauri::{
 
 #[tauri::command]
 async fn execute_query(table_names: Vec<String>) -> Result<HashMap<String, Value>, String> {
-    use std::os::windows::process::CommandExt;
     use serde_json::Value;
     use std::collections::HashMap;
+    use std::process::{Command, Stdio};
 
-    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    #[cfg(windows)]
+    use std::os::windows::process::CommandExt;
 
     let mut all_results = HashMap::new();
 
     for table_name in table_names {
-        // Execute osquery command
-        let output = Command::new("osqueryi")
-            .args(&[
-                "--json",
-                &format!("SELECT * FROM {}", table_name),
-            ])
-            .creation_flags(CREATE_NO_WINDOW)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+        // Configure the command
+        let mut cmd = Command::new("osqueryi");
+        
+        cmd.args(&[
+            "--json",
+            &format!("SELECT * FROM {}", table_name),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+        // Windows-specific: Hide console window
+        #[cfg(windows)]
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+        // Execute the command
+        let output = cmd
             .output()
             .map_err(|e| format!("Failed to run osquery: {}", e))?;
-        
+
         if !output.status.success() {
             let error_msg = String::from_utf8_lossy(&output.stderr);
             return Err(format!(
@@ -43,6 +50,7 @@ async fn execute_query(table_names: Vec<String>) -> Result<HashMap<String, Value
             ));
         }
 
+        // Handle output
         let stdout_str = String::from_utf8(output.stdout)
             .map_err(|e| format!("Invalid UTF-8 output for table {}: {}", table_name, e))?;
 
