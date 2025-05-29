@@ -17,7 +17,6 @@ export default function SignInForm() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-
   const validateInputs = () => {
     let isValid = true;
     if (!email) {
@@ -45,7 +44,7 @@ export default function SignInForm() {
     setIsSubmitting(true);
     try {
       if (!validateInputs()) return;
-      await authenticateUser(email, password);
+      await authenticateUser(email, password, "");
       if (!error) {
         notify("Sign in successful.", "success");
         navigate("/home");
