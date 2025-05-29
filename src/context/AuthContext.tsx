@@ -4,9 +4,14 @@ import { useNavigate } from "react-router-dom";
 type AuthContextType = {
   token: string | null;
   isAuthenticated: boolean;
+  isAccountConfigRequired: boolean;
   error: string;
   checkAuthentication: () => void;
-  authenticateUser: (username: string, password: string) => void;
+  authenticateUser: (
+    username: string,
+    password: string,
+    accountId: string | undefined
+  ) => void;
   logout: () => void;
 };
 
@@ -19,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAccountConfigRequired, setIsAccountConfigRequired] = useState(false);
 
   async function checkAuthentication() {
     try {
@@ -39,28 +45,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsAuthenticated(false);
     }
   }
-  
 
-  async function authenticateUser(username: string, password: string) {
+  async function authenticateUser(
+    username: string,
+    password: string,
+    accountId: string | undefined
+  ) {
     try {
-      const requestBody = {
-        data: {
-          type: "authorization",
-          attributes: {
-            email: username,
-            password: password,
-          },
-          relationships: {
-            account: {
-              data: {
-                type: "account",
-                id: 264178000,
+      const requestBody = accountId
+        ? {
+            data: {
+              type: "authorization",
+              attributes: {
+                email: username,
+                password: password,
+              },
+              relationships: {
+                account: {
+                  data: {
+                    type: "account",
+                    id: accountId,
+                  },
+                },
               },
             },
-          },
-        },
-      };
-
+          }
+        : {
+            data: {
+              type: "authorization",
+              attributes: {
+                email: username,
+                password: password,
+              },
+            },
+          };
       const response = await fetch(`https://api.klaay.dev/authenticate`, {
         method: "POST",
         headers: {
@@ -69,15 +87,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         body: JSON.stringify(requestBody),
       });
 
-      if (response.ok) {
+      if (response.status === 201) {
         const responseData = await response.json();
 
         const token = responseData.data.attributes.token;
-        setToken(token);
-        localStorage.setItem("jwtToken", token);
+        if (token) {
+          setToken(token);
+          localStorage.setItem("jwtToken", token);
+        }
 
-        const user = responseData.data.relationships.user.data;
-        const account = responseData.data.relationships.account.data;
+        const user = responseData.included?.[0]?.attributes;
+        const account = responseData.data.relationships?.user?.data;
+
+        if (account) {
+          setIsAccountConfigRequired(true);
+          navigate("/account-setup", {
+            state: {
+              username: username,
+              password: password,
+            },
+          });
+        } else {
+          setIsAccountConfigRequired(false);
+          navigate("/home");
+        }
 
         console.log("Authenticated User:", user);
         console.log("Authenticated Account:", account);
@@ -97,15 +130,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedToken = localStorage.getItem("jwtToken");
 
     const currentPath = window.location.pathname;
+
+    console.log("Account Config Required:", isAccountConfigRequired);
     if (savedToken) {
-      console.log("savedToken", savedToken);
-      setToken(savedToken);
-      setIsAuthenticated(true);
-      if (currentPath == "/signin") {
-        navigate("/home");
+      if (isAccountConfigRequired) {
+        console.log("savedToken", savedToken);
+        setToken(savedToken);
+        setIsAuthenticated(true);
+        if (currentPath == "/signin") {
+          navigate("/account-setup");
+        }
+      } else {
+        console.log("savedToken", savedToken);
+        setToken(savedToken);
+        setIsAuthenticated(true);
+        if (currentPath == "/signin") {
+          navigate("/home");
+        }
       }
     } else {
-        navigate("/signin");
+      navigate("/signin");
     }
   }, []);
 
@@ -117,7 +161,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated, error, checkAuthentication, authenticateUser, logout }}>
+    <AuthContext.Provider
+      value={{
+        token,
+        isAuthenticated,
+        isAccountConfigRequired,
+        error,
+        checkAuthentication,
+        authenticateUser,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
