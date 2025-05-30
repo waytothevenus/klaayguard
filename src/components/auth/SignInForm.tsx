@@ -9,7 +9,12 @@ import { notify } from "../../utils/utils";
 
 export default function SignInForm() {
   const navigate = useNavigate();
-  const { checkAuthentication, authenticateUser, error } = useAuth();
+  const {
+    checkAuthentication,
+    isAccountConfigRequired,
+    authenticateUser,
+    error,
+  } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -45,9 +50,17 @@ export default function SignInForm() {
     try {
       if (!validateInputs()) return;
       await authenticateUser(email, password, "");
+
       if (!error) {
-        notify("Sign in successful.", "success");
-        navigate("/home");
+        if (isAccountConfigRequired) {
+          notify("Account configuration required. Redirecting...", "info");
+          navigate("/account-setup", {
+            state: { username: email, password },
+          });
+        } else {
+          notify("Sign in successful.", "success");
+          navigate("/home");
+        }
       } else {
         notify(error, "error");
       }

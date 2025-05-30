@@ -2,7 +2,7 @@ import PageMeta from "../../components/common/PageMeta";
 import AuthLayout from "./AuthPageLayout";
 import { AccountSetupForm } from "../../components/auth/AccountSetupForm";
 
-export default function SignIn() {
+export default function AccountSetup() {
   return (
     <>
       <PageMeta

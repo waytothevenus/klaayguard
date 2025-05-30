@@ -74,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             data: {
               type: "authorization",
               attributes: {
-                username: username,
+                email: username,
                 password: password,
               },
             },
@@ -87,17 +87,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         body: JSON.stringify(requestBody),
       });
 
-      if (response.ok) {
+      if (response.status === 201) {
         const responseData = await response.json();
 
         const token = responseData.data.attributes.token;
-        setToken(token);
-        localStorage.setItem("jwtToken", token);
+        if (token) {
+          setToken(token);
+          localStorage.setItem("jwtToken", token);
+        }
 
-        const user = responseData.data.included[0].attributes;
-        const account = responseData.data.relationships.user.data;
+        const user = responseData.included?.[0]?.attributes;
+        const account = responseData.data.relationships?.user?.data;
 
-        if (!account) {
+        if (account) {
           setIsAccountConfigRequired(true);
           navigate("/account-setup", {
             state: {
@@ -105,6 +107,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
               password: password,
             },
           });
+        } else {
+          setIsAccountConfigRequired(false);
+          navigate("/home");
         }
 
         console.log("Authenticated User:", user);
@@ -125,12 +130,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedToken = localStorage.getItem("jwtToken");
 
     const currentPath = window.location.pathname;
+
+    console.log("Account Config Required:", isAccountConfigRequired);
     if (savedToken) {
-      console.log("savedToken", savedToken);
-      setToken(savedToken);
-      setIsAuthenticated(true);
-      if (currentPath == "/signin") {
-        navigate("/home");
+      if (isAccountConfigRequired) {
+        console.log("savedToken", savedToken);
+        setToken(savedToken);
+        setIsAuthenticated(true);
+        if (currentPath == "/signin") {
+          navigate("/account-setup");
+        }
+      } else {
+        console.log("savedToken", savedToken);
+        setToken(savedToken);
+        setIsAuthenticated(true);
+        if (currentPath == "/signin") {
+          navigate("/home");
+        }
       }
     } else {
       navigate("/signin");
