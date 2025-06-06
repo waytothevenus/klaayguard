@@ -80,7 +80,7 @@ export const AccountSetupForm: React.FC<AccountSelectorProps> = ({
     }
     try {
       await authenticateUser(username, password, selected);
-      navigate("/home");
+      // navigate("/home");
     } catch (error) {
       notify(new String(error).toString(), "error");
     }
