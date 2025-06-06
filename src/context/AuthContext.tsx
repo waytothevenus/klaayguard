@@ -99,8 +99,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const user = responseData.included?.[0]?.attributes;
         const account = responseData.data.relationships?.user?.data;
 
-        if (account) {
+        if (!account?.id) {
           setIsAccountConfigRequired(true);
+          console.log("Not Found Account ID, Navigating to Account Setup");
           navigate("/account-setup", {
             state: {
               username: username,
