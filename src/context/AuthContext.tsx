@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 type AuthContextType = {
   token: string | null;
@@ -46,6 +47,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }
 
+  const decodeTokenManually = (token: string) => {
+    try {
+      const payload = jwtDecode(token);
+      console.log(
+        "Decoded Payload:",
+        payload.iss,
+        payload.sub,
+        payload.aud,
+        payload.exp,
+        payload.nbf,
+        payload.iat,
+        payload.jti
+      );
+      return payload;
+    } catch (error) {
+      console.error("Failed to decode JWT:", error);
+      return null;
+    }
+  };
+
   async function authenticateUser(
     username: string,
     password: string,
@@ -90,16 +111,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (response.status === 201) {
         const responseData = await response.json();
 
-        const token = responseData.data.attributes.token;
-        if (token) {
-          setToken(token);
-          localStorage.setItem("jwtToken", token);
+        const jwtToken = responseData.data.attributes.token;
+        if (jwtToken) {
+          setToken(jwtToken);
+          localStorage.setItem("jwtToken", jwtToken);
         }
 
         const user = responseData.included?.[0]?.attributes;
-        const account = responseData.data.relationships?.user?.data;
+        //
+        const account = decodeTokenManually(jwtToken) as any;
 
-        if (!account?.id) {
+        console.log("Decoded Account:", account);
+
+        if (!account?.account_id) {
           setIsAccountConfigRequired(true);
           console.log("Not Found Account ID, Navigating to Account Setup");
           navigate("/account-setup", {
