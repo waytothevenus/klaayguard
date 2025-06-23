@@ -205,25 +205,50 @@ pub fn install_osquery() -> Result<()> {
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
 }
+enum LinuxPackageManager {
+    Apt,
+    Dnf,
+    Zypper,
+}
 
 #[cfg(target_os = "linux")]
-pub fn install_osquery() -> Result<()> {
-    
-    info!("Preparing osquery installation on Linux");
-
-    // Check if curl is installed
-    let curl_installed = Command::new("which")
-        .arg("curl")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+fn get_package_manager() -> Result<LinuxPackageManager> {
+    // debian based
+    let apt_installed = Command::new("which")
+        .arg("apt")
         .status()
-        .is_ok();
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if apt_installed {
+        info!("detected apt");
+        return Ok(LinuxPackageManager::Apt);
+    }
 
-    if !curl_installed {
-        warn!("curl not found. Installing curl first...");
-        
-        // Try to install curl using the system package manager
-        let status = if Command::new("which").arg("apt-get").status().is_ok() {
+    // fedora based
+    let dnf_installed= Command::new("which")
+        .arg("dnf")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if dnf_installed {
+        info!("detected dnf");
+        return Ok(LinuxPackageManager::Dnf);
+    }
+
+    // suse based
+    let zypper_installed= Command::new("which")
+        .arg("zypper")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if zypper_installed {
+        info!("detected zypper");
+        return Ok(LinuxPackageManager::Zypper);
+    }
+
+    Err(anyhow::anyhow!("Couldn't find supported package manager"))
+}
+
             Command::new("sudo")
                 .args(&["apt-get", "update"])
                 .status()
