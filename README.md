@@ -17,8 +17,21 @@ A lightweight desktop application built with Tauri and [your tech stack, e.g., R
 - [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
 - [Tauri Prerequisites](https://v1.tauri.app/v1/guides/getting-started/prerequisites/)
 
+## Building Klaayguard for Kiln/Earthenware development
+1. clone the repo:
+   ```bash
+   git clone https://github.com/klaayinc/klaayguard.git
+   cd klaayguard
+   ```
+
+2. create a `.env` with the same content as `.env.example`
+
+3. in the project root, run `docker compose run --rm klaayguard -- yarn run tauri build`
+
+4. you will now have a binary `src-tauri/target/release/klaay`
+
 ## Quick Start
-1. Clone the repo:
+1. clone the repo:
    ```bash
    git clone https://github.com/klaayinc/klaayguard.git
    cd klaayguard
