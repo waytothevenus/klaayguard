@@ -32,11 +32,18 @@ export const Home = () => {
     | { [key: string]: DeepRecord };
 
   const [config, setConfig] = useState<Config | null>(null);
+  const [deviceUUID, setDeviceUUID] = useState<String | null>(null);
   const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     checkInstallation();
+
+    const getDeviceId = async () => {
+      const uuid = await get_device_uuid();
+      setDeviceUUID(uuid);
+    }
+    getDeviceId();
   }, []);
 
   useEffect(() => {
@@ -135,6 +142,16 @@ export const Home = () => {
       }
     } catch (err) {
       console.error("Error posting data to API:", err);
+    }
+  }
+
+  async function get_device_uuid(): Promise<String | null> {
+    try {
+      const response = await invoke<String>("get_device_uuid");
+      return response;
+    } catch(error) { 
+      console.error("Error getting device id: ", error);
+      return null;
     }
   }
 
