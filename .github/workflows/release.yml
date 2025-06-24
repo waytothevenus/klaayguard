@@ -66,13 +66,10 @@ jobs:
       - name: install frontend dependencies
         run: yarn install # change this to npm or pnpm depending on which one you use.
 
-      - name: set dev env var
-        if: matrix.buildType == 'dev'
-        run: echo "VITE_API_BASE_URL=http://localhost:300" >> $GITHUB_ENV
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VITE_API_BASE_URL: ${{ matrix.buildType == 'dev' && 'http://localhost:3000' || '' }}
         with:
           tagName: ${{ matrix.buildType }}-app-v__VERSION__ # Prefix tag with build type
           releaseName: "${{ matrix.buildType }} App v__VERSION__" # Prefix release name with build type
