@@ -61,7 +61,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: "./src-tauri -> target"
+          workspaces: "./src-tauri -> target-${{ matrix.buildType }}"
 
       - name: install frontend dependencies
         run: yarn install # change this to npm or pnpm depending on which one you use.
