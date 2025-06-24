@@ -14,12 +14,28 @@ jobs:
         include:
           - platform: "macos-latest" # for Arm based macs (M1 and above).
             args: "--target aarch64-apple-darwin"
+            buildType: prod
           - platform: "macos-latest" # for Intel based macs.
             args: "--target x86_64-apple-darwin"
+            buildType: prod
           - platform: "ubuntu-22.04"
             args: ""
+            buildType: prod
           - platform: "windows-latest"
             args: ""
+            buildType: prod
+          - platform: "macos-latest" # for Arm based macs (M1 and above).
+            args: "--target aarch64-apple-darwin"
+            buildType: dev
+          - platform: "macos-latest" # for Intel based macs.
+            args: "--target x86_64-apple-darwin"
+            buildType: dev
+          - platform: "ubuntu-22.04"
+            args: ""
+            buildType: dev
+          - platform: "windows-latest"
+            args: ""
+            buildType: dev
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +65,10 @@ jobs:
 
       - name: install frontend dependencies
         run: yarn install # change this to npm or pnpm depending on which one you use.
+
+      - name: set dev env var
+        if: matrix.buildType == 'dev'
+        run: echo "VITE_API_BASE_URL=http://localhost:300" >> $GITHUB_ENV
 
       - uses: tauri-apps/tauri-action@v0
         env:
