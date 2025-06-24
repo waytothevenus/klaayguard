@@ -193,6 +193,13 @@ export const Home = () => {
       <h1 className="text-2xl font-bold text-center text-gray-800 mb-4">
         Welcome to the Klaay Guard
       </h1>
+      {deviceUUID && (
+        <div className="bg-gray-50 border border-gray-200 rounded px-4 py-2 mb-4 mx-auto max-w-lg">
+          <p className="text-sm text-gray-700 text-center">
+            Device ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{deviceUUID}</span>
+          </p>
+        </div>
+      )}
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {isOsQueryInstalling ? (
         <p className="text-yellow-600 mb-4">Installing osquery...</p>
