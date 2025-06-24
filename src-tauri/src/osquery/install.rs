@@ -205,95 +205,208 @@ pub fn install_osquery() -> Result<()> {
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
 }
+enum LinuxPackageManager {
+    Apt,
+    Dnf,
+    Zypper,
+}
+
+#[cfg(target_os = "linux")]
+fn get_package_manager() -> Result<LinuxPackageManager> {
+    // debian based
+    let apt_installed = Command::new("which")
+        .arg("apt")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if apt_installed {
+        info!("detected apt");
+        return Ok(LinuxPackageManager::Apt);
+    }
+
+    // fedora based
+    let dnf_installed= Command::new("which")
+        .arg("dnf")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if dnf_installed {
+        info!("detected dnf");
+        return Ok(LinuxPackageManager::Dnf);
+    }
+
+    // suse based
+    let zypper_installed= Command::new("which")
+        .arg("zypper")
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if zypper_installed {
+        info!("detected zypper");
+        return Ok(LinuxPackageManager::Zypper);
+    }
+
+    Err(anyhow::anyhow!("Couldn't find supported package manager"))
+}
+
+#[cfg(target_os = "linux")]
+fn configure_osquery_repo(package_manager: &LinuxPackageManager) -> Result<()> {
+    match package_manager {
+        LinuxPackageManager::Apt => {
+            Command::new("sudo")
+                .args(&["mkdir", "-p", "/etc/apt/keyrings"])
+                .status()
+                .and_then(|s| {
+                    if s.success() {
+                        Command::new("sh")
+                            .arg("-c")
+                            .arg("curl -L https://pkg.osquery.io/deb/pubkey.gpg | sudo tee /etc/apt/keyrings/osquery.asc")
+                            .status()
+                    } else {
+                        Ok(s)
+                    }
+                })
+                .and_then(|s| {
+                    if s.success() {
+                    Command::new("sudo")
+                            .args(&[
+                                "add-apt-repository",
+                                "deb [arch=amd64 signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main",
+                            ])
+                        .status()
+                    } else {
+                        Ok(s)
+                    }
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to configure apt repo: {}", e))
+                .and_then(|s| {
+                    if s.success() {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Failed to configure apt repo"))
+                    }
+                })
+        },
+        LinuxPackageManager::Dnf => {
+            Command::new("sh")
+                .arg("-c")
+                .arg("curl -L https://pkg.osquery.io/rpm/GPG | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-osquery")
+                .status()
+                .and_then(|s| {
+                    if s.success() {
+                        Command::new("sudo")
+                            .args(&["yum-config-manager", "--add-repo", "https://pkg.osquery.io/rpm/osquery-s3-rpm.repo"])
+                            .status()
+                    } else {
+                        Ok(s)
+                    }
+                })
+                .and_then(|s| {
+                    if s.success() {
+            Command::new("sudo")
+                            .args(&["yum-config-manager", "--enable", "osquery-s3-rpm-repo"])
+                            .status()
+                    } else {
+                        Ok(s)
+                    }
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to configure yum/dnf repo: {}", e))
+                .and_then(|s| {
+                    if s.success() {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Failed to configure yum/dnf repo"))
+                    }
+                })
+        },
+        LinuxPackageManager::Zypper => {
+            Command::new("sh")
+                .arg("-c")
+                .arg("curl -L https://pkg.osquery.io/rpm/GPG | sudo tee /etc/pki/rpm-gpg/RPM-GPG-KEY-osquery")
+                .status()
+                .and_then(|s| {
+                    if s.success() {
+                        Command::new("sudo")
+                            .args(&["zypper", "ar", "-f", "https://pkg.osquery.io/rpm/osquery-s3-rpm.repo"])
+                            .status()
+                    } else {
+                        Ok(s)
+                    }
+                })
+                .and_then(|s| {
+                    if s.success() {
+            Command::new("sudo")
+                            .args(&["zypper", "mr", "-e", "osquery-s3-rpm-repo"])
+                .status()
+        } else {
+                        Ok(s)
+                    }
+                })
+                .map_err(|e| anyhow::anyhow!("Failed to configure zypper repo: {}", e))
+                .and_then(|s| {
+                    if s.success() {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Failed to configure zypper repo"))
+                    }
+                })
+        }
+    }
+}
 
 #[cfg(target_os = "linux")]
 pub fn install_osquery() -> Result<()> {
-    
     info!("Preparing osquery installation on Linux");
 
-    // Check if curl is installed
-    let curl_installed = Command::new("which")
-        .arg("curl")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok();
+    let package_manager = get_package_manager()?;
 
-    if !curl_installed {
-        warn!("curl not found. Installing curl first...");
-        
-        // Try to install curl using the system package manager
-        let status = if Command::new("which").arg("apt-get").status().is_ok() {
-            Command::new("sudo")
-                .args(&["apt-get", "update"])
-                .status()
-                .and_then(|_| {
-                    Command::new("sudo")
-                        .args(&["apt-get", "install", "-y", "curl"])
-                        .status()
-                })
-        } else if Command::new("which").arg("yum").status().is_ok() {
-            Command::new("sudo")
-                .args(&["yum", "install", "-y", "curl"])
-                .status()
-        } else if Command::new("which").arg("dnf").status().is_ok() {
-            Command::new("sudo")
-                .args(&["dnf", "install", "-y", "curl"])
-                .status()
-        } else if Command::new("which").arg("zypper").status().is_ok() {
-            Command::new("sudo")
-                .args(&["zypper", "install", "-y", "curl"])
-                .status()
-        } else {
-            return Err(anyhow::anyhow!("Could not determine package manager to install curl"));
-        };
-
-        match status {
-            Ok(status) if !status.success() => {
-                return Err(anyhow::anyhow!("curl installation failed with status: {}", status));
-            },
-            Err(e) => {
-                return Err(anyhow::anyhow!("Failed to install curl: {}", e));
-            },
-            _ => () // Success
-        }
-
-        info!("curl installed successfully");
-    }
+    // Configure the osquery repository before installation
+    configure_osquery_repo(&package_manager)?;
 
     // Install osquery with retry logic
     let mut attempts = 0;
     let max_attempts = 3;
     let mut last_error = None;
-    let osquery_version = "5.10.2"; // You might want to make this configurable
 
     while attempts < max_attempts {
         attempts += 1;
-        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
+        info!(
+            "Attempt {} of {} to install osquery",
+            attempts, max_attempts
+        );
 
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg(format!(
-                "curl -sSL https://pkg.osquery.io/deb/osquery_{}-1.linux_amd64.deb -o /tmp/osquery.deb && \
-                sudo dpkg -i /tmp/osquery.deb || sudo apt-get install -f -y",
-                osquery_version
-            ))
-            .status();
+        let osquery_install_status = match package_manager {
+            LinuxPackageManager::Apt => Command::new("sudo")
+                .args(&["apt", "install", "-y", "osquery"])
+                .status(),
+            LinuxPackageManager::Dnf => Command::new("sudo")
+                .args(&["yum", "install", "-y", "osquery"])
+                .status(),
+            LinuxPackageManager::Zypper => Command::new("sudo")
+                .args(&["zypper", "--non-interactive", "install", "osquery"])
+                .status(),
+        };
 
-        match status {
+        match osquery_install_status {
             Ok(status) if status.success() => {
                 info!("osquery installation completed successfully");
-                // Clean up the downloaded package
-                let _ = Command::new("rm").arg("-f").arg("/tmp/osquery.deb").status();
                 return Ok(());
-            },
+            }
             Ok(status) => {
                 last_error = Some(format!("Installation failed with status: {}", status));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            },
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
+            }
             Err(e) => {
                 last_error = Some(format!("Failed to execute installation command: {}", e));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
             }
         }
 
