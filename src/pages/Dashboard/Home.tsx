@@ -113,6 +113,10 @@ export const Home = () => {
   async function postDataToApi() {
     try {
       console.log("Posting data to API...", { queryResult });
+      if (!deviceUUID) {
+        console.error("No device uuid.");
+        return;
+      }
       if (!queryResult) {
         console.error("No data to post.");
         return;
@@ -134,7 +138,7 @@ export const Home = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ data: formattedData }),
+        body: JSON.stringify({ device_uuid: deviceUUID, data: formattedData }),
       });
 
       if (!response.ok) {
