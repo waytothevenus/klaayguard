@@ -1,0 +1,15 @@
+volumes:
+  yarn-cache:
+  cargo-cache:
+
+services:
+  klaayguard:
+    build:
+      context: ./klaayguard
+    volumes:
+      - ../:/app
+      - yarn-cache:/home/node/.cache/yarn
+      - cargo-cache:/usr/local/cargo/registry
+    env_file:
+      - path: ../.env
+        required: false
