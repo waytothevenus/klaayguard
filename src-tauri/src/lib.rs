@@ -10,6 +10,28 @@ use tauri::{
     Manager,
 };
 
+// will return a different id every call if you don't have a hardware id until
+// a build with https://github.com/osquery/osquery/pull/8616 is released
+#[tauri::command]
+async fn get_device_uuid() -> Result<String, String> {
+    let tables = vec!("system_info".to_string());
+    let query_result = execute_query(tables).await?;
+    
+    // Navigate the nested structure:
+    // 1. Get "system_info" array
+    // 2. Get first item in array
+    // 3. Get "uuid" from that item
+    let uuid = query_result
+        .get("system_info")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|obj| obj.get("uuid"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Couldn't find device uuid".to_string())?;
+    
+    Ok(uuid.to_string())
+}
+
 #[tauri::command]
 async fn execute_query(table_names: Vec<String>) -> Result<HashMap<String, Value>, String> {
     use serde_json::Value;
@@ -122,7 +144,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             execute_query,
             install_osquery,
-            check_osquery
+            check_osquery,
+            get_device_uuid,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
