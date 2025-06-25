@@ -103,6 +103,29 @@ async fn install_osquery() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn auto_install_osquery() -> Result<(), String> {
+    // First check if osquery is already installed
+    if install::is_osquery_installed() {
+        // If already installed, just mark first launch as complete
+        mark_first_launch_complete().await?;
+        return Ok(());
+    }
+    
+    // Install osquery
+    install::install_osquery().map_err(|e| e.to_string())?;
+    
+    // Verify installation was successful
+    if !install::is_osquery_installed() {
+        return Err("osquery installation completed but verification failed".to_string());
+    }
+    
+    // Mark first launch as complete
+    mark_first_launch_complete().await?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 async fn is_first_launch() -> Result<bool, String> {
     let home_dir = dirs::home_dir()
         .ok_or_else(|| "Could not determine home directory".to_string())?;
@@ -189,6 +212,7 @@ pub fn run() {
             get_device_uuid,
             is_first_launch,
             mark_first_launch_complete,
+            auto_install_osquery,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
