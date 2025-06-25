@@ -3,9 +3,7 @@ use osquery::install;
 use serde_json::Value;
 use std::{
     collections::HashMap,
-    path::PathBuf,
-    fs,
-    time::{SystemTime, UNIX_EPOCH},
+    process::{Command, Stdio},
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -22,62 +20,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone)]
 struct InstallationStatus {
     installed: bool,
-    timestamp: u64,
-    version: Option<String>,
     platform: String,
-    error_count: u32,
-    last_error: Option<String>,
 }
 
 impl Default for InstallationStatus {
     fn default() -> Self {
         Self {
             installed: false,
-            timestamp: 0,
-            version: None,
             platform: std::env::consts::OS.to_string(),
-            error_count: 0,
-            last_error: None,
         }
     }
-}
-
-fn get_installation_status_path() -> Result<PathBuf, String> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
-    
-    let klaayguard_dir = home_dir.join(".klaayguard");
-    Ok(klaayguard_dir.join("installation_status.json"))
-}
-
-fn load_installation_status() -> Result<InstallationStatus, String> {
-    let status_path = get_installation_status_path()?;
-    
-    if !status_path.exists() {
-        return Ok(InstallationStatus::default());
-    }
-    
-    let content = fs::read_to_string(&status_path)
-        .map_err(|e| format!("Failed to read installation status: {}", e))?;
-    
-    serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse installation status: {}", e))
-}
-
-fn save_installation_status(status: &InstallationStatus) -> Result<(), String> {
-    let status_path = get_installation_status_path()?;
-    let klaayguard_dir = status_path.parent()
-        .ok_or_else(|| "Invalid status path".to_string())?;
-    
-    // Create directory if it doesn't exist
-    fs::create_dir_all(klaayguard_dir)
-        .map_err(|e| format!("Failed to create directory: {}", e))?;
-    
-    let content = serde_json::to_string_pretty(status)
-        .map_err(|e| format!("Failed to serialize installation status: {}", e))?;
-    
-    fs::write(&status_path, content)
-        .map_err(|e| format!("Failed to write installation status: {}", e))
 }
 
 // will return a different id every call if you don't have a hardware id until
@@ -170,7 +122,7 @@ async fn install_osquery() -> Result<(), String> {
     install::install_osquery().map_err(|e| e.to_string())
 }
 
-fn install_osquery_with_progress<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
+fn install_osquery_with_progress<R: tauri::Runtime>(_app: &tauri::AppHandle<R>) -> Result<(), String> {
     // For now, just call the regular install function
     // Progress events can be added later when we figure out the correct Tauri 2.0 API
     match install::install_osquery() {
@@ -184,74 +136,44 @@ fn install_osquery_with_progress<R: Runtime>(_app: &AppHandle<R>) -> Result<(), 
 }
 
 #[tauri::command]
-async fn auto_install_osquery<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+async fn auto_install_osquery<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
     let result = install_osquery_with_progress(&app);
     if result.is_ok() {
-        mark_first_launch_complete().await?;
+        // Mark installation as complete (simplified approach)
+        Ok(())
+    } else {
+        result
     }
-    result
 }
 
 #[tauri::command]
 async fn is_first_launch() -> Result<bool, String> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
-    
-    let klaayguard_dir = home_dir.join(".klaayguard");
-    let first_launch_file = klaayguard_dir.join("first_launch_complete");
-    
-    // Check if the first launch file exists
-    Ok(!first_launch_file.exists())
+    // Simplified approach: just check if osquery is installed
+    // If not installed, consider it first launch
+    Ok(!install::is_osquery_installed())
 }
 
 #[tauri::command]
 async fn mark_first_launch_complete() -> Result<(), String> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| "Could not determine home directory".to_string())?;
-    
-    let klaayguard_dir = home_dir.join(".klaayguard");
-    let first_launch_file = klaayguard_dir.join("first_launch_complete");
-    
-    // Create directory if it doesn't exist
-    fs::create_dir_all(&klaayguard_dir)
-        .map_err(|e| format!("Failed to create directory: {}", e))?;
-    
-    // Create the first launch file
-    fs::write(&first_launch_file, "osquery_installed")
-        .map_err(|e| format!("Failed to create first launch file: {}", e))?;
-    
-    // Update installation status
-    let mut status = load_installation_status()?;
-    status.installed = true;
-    status.timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("Failed to get timestamp: {}", e))?
-        .as_secs();
-    status.version = Some("5.17.0".to_string()); // osquery version
-    status.error_count = 0;
-    status.last_error = None;
-    
-    save_installation_status(&status)?;
-    
+    // Simplified approach: just return success
+    // The actual installation status is checked by is_osquery_installed()
     Ok(())
 }
 
 #[tauri::command]
 async fn get_installation_status() -> Result<InstallationStatus, String> {
-    load_installation_status()
+    let status = InstallationStatus {
+        installed: install::is_osquery_installed(),
+        platform: std::env::consts::OS.to_string(),
+    };
+    Ok(status)
 }
 
 #[tauri::command]
-async fn record_installation_error(error_message: String) -> Result<(), String> {
-    let mut status = load_installation_status()?;
-    status.error_count += 1;
-    status.last_error = Some(error_message);
-    status.timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("Failed to get timestamp: {}", e))?
-        .as_secs();
-    
-    save_installation_status(&status)
+async fn record_installation_error(_error_message: String) -> Result<(), String> {
+    // Simplified approach: just return success
+    // Error tracking can be implemented later if needed
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -266,11 +188,15 @@ pub fn run() {
                     api.prevent_close();
                 }
             });
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i, &show_i, &hide_i])?;
-            TrayIconBuilder::new()
+            
+            // Create tray menu
+            let quit_i = tauri::menu::MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = tauri::menu::MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let hide_i = tauri::menu::MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
+            let menu = tauri::menu::Menu::with_items(app, &[&quit_i, &show_i, &hide_i])?;
+            
+            // Create tray icon
+            tauri::tray::TrayIconBuilder::new()
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -289,10 +215,10 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| match event {
-                    TrayIconEvent::Enter { .. } => {
+                    tauri::tray::TrayIconEvent::Enter { .. } => {
                         tray.set_tooltip(Some("Klaay Guard".to_string())).unwrap();
                     }
-                    TrayIconEvent::Leave { .. } => {
+                    tauri::tray::TrayIconEvent::Leave { .. } => {
                         tray.set_tooltip(Some("")).unwrap();
                     }
                     _ => {}

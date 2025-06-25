@@ -7,20 +7,14 @@
   ],
   "permissions": [
     "core:default",
+    "core:app:default",
+    "core:event:default",
+    "core:path:default",
+    "core:window:default",
+    "core:webview:default",
+    "core:menu:default",
+    "core:tray:default",
     "opener:default",
-    "shell:default",
-    "fs:default",
-    "fs:read-file",
-    "fs:write-file",
-    "fs:create-dir",
-    "fs:scope",
-    "http:default",
-    "http:request",
-    "http:scope",
-    "path:default",
-    "os:default",
-    "process:default",
-    "process:relaunch",
-    "process:relaunch-deps"
+    "shell:default"
   ]
 }

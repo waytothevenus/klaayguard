@@ -49,6 +49,17 @@ const Setup: React.FC = () => {
     };
   }, []);
 
+  // Patch: If error but osquery is installed, treat as success
+  React.useEffect(() => {
+    if (installationState === "error" && status?.installed) {
+      setInstallationState("success");
+      setProgressMessage("osquery is already installed on your system.");
+      setTimeout(() => {
+        navigate("/signin");
+      }, 2000);
+    }
+  }, [installationState, status, navigate]);
+
   const fetchStatus = async () => {
     try {
       const result = await invoke<InstallationStatus>("get_installation_status");
@@ -85,11 +96,11 @@ const Setup: React.FC = () => {
       <div className="mt-4 p-3 bg-gray-50 rounded text-left text-xs text-gray-500 border border-gray-200">
         <div><b>Platform:</b> {status.platform}</div>
         <div><b>Installed:</b> {status.installed ? "Yes" : "No"}</div>
-        <div><b>Error Count:</b> {status.error_count}</div>
+        <div><b>Error Count:</b> {status.error_count ?? "N/A"}</div>
         {status.last_error && <div><b>Last Error:</b> {status.last_error}</div>}
-        {status.timestamp > 0 && (
+        {status.timestamp ? (
           <div><b>Last Attempt:</b> {new Date(status.timestamp * 1000).toLocaleString()}</div>
-        )}
+        ) : null}
         {status.version && <div><b>Version:</b> {status.version}</div>}
       </div>
     );
