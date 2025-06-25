@@ -2,64 +2,159 @@
 
 [![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-FFC131.svg?logo=tauri)](https://tauri.app)
 
-A lightweight desktop application built with Tauri and [your tech stack, e.g., React/Svelte/Vue].
+**KlaayGuard** is a cross-platform desktop security monitoring application that collects system information using osquery and reports it to a centralized API for security analysis.
 
-![App Screenshot](./screenshot.png) *(Optional screenshot)*
+## 🎯 Purpose
 
-## Features
-- Feature 1 (e.g., Cross-platform support)
-- Feature 2 (e.g., Offline capability)
-- Feature 3 (e.g., Native system integrations)
+KlaayGuard automatically:
+- Installs and manages osquery on Windows, macOS, and Linux
+- Collects system security data (processes, network connections, installed software, etc.)
+- Reports data to `https://api.klaay.dev` every 15 minutes
+- Runs as a system tray application for background monitoring
+- Provides authentication and secure data transmission
 
-## Prerequisites
-- [Node.js](https://nodejs.org/) (v22 recommended)
-- [Rust](https://www.rust-lang.org/) (latest stable)
-- [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
-- [Tauri Prerequisites](https://v1.tauri.app/v1/guides/getting-started/prerequisites/)
+## 🚀 Quick Start
 
-## Building Klaayguard for Kiln/Earthenware development
-1. clone the repo:
-   ```bash
-   git clone https://github.com/klaayinc/klaayguard.git
-   cd klaayguard
-   ```
+### Prerequisites
+```bash
+# Install Node.js (v22+ recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 22
+nvm use 22
 
-2. create a `.env` with the same content as `.env.example`
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
 
-3. in the project root, run `docker compose run --rm klaayguard -- yarn run tauri build`
+# Install Tauri CLI
+cargo install tauri-cli
 
-4. you will now have a binary `src-tauri/target/release/klaay`
+# Install Yarn (if not using npm)
+npm install -g yarn
+```
 
-## Quick Start
-1. clone the repo:
-   ```bash
-   git clone https://github.com/klaayinc/klaayguard.git
-   cd klaayguard
+### Setup & Development
+```bash
+# Clone and setup
+git clone https://github.com/klaayinc/klaayguard.git
+cd klaayguard
 
-2. Install Dependencies:
-    ```bash 
-    npm install  # or pnpm/yarn
+# Install dependencies
+yarn install
 
-3. Run in development
-    ```bash
-    npm run tauri dev # or yarn tauri dev
+# Create environment file
+echo "VITE_API_BASE_URL=https://api.klaay.dev" > .env
 
-4. Build the production:
-    ```bash
-    npm run tauri build # or yarn tauri dev
+# Run in development
+yarn tauri dev
+```
 
-Project Structure
+### Build for Production
+```bash
+# Build for current platform
+yarn tauri build
 
-    /
-    ├── src-tauri/      # Tauri backend (Rust)
-    ├── src/            # Frontend (e.g., React/Vue files)
-    ├── public/         # Static assets
-    └── ...             # Other config files
+# Build for specific platforms
+yarn tauri build --target x86_64-pc-windows-msvc    # Windows
+yarn tauri build --target aarch64-apple-darwin      # macOS Apple Silicon
+yarn tauri build --target x86_64-apple-darwin       # macOS Intel
+yarn tauri build --target x86_64-unknown-linux-gnu  # Linux
+```
 
-Build for different platforms
+## 🏗️ Multi-Platform Support
 
-    Platform	Command
-    ```bash
-    Windows	    npm run tauri build -- --target x86_64-pc-windows-msvc
-    macOS	    npm run tauri build -- --target aarch64-apple-darwin
-    Linux	    npm run tauri build -- --target x86_64-unknown-linux-gnu
+### Windows
+- **Target**: `x86_64-pc-windows-msvc`
+- **osquery**: Installed via Chocolatey package manager
+- **Features**: System tray, background monitoring
+
+### macOS
+- **Targets**: `aarch64-apple-darwin` (Apple Silicon), `x86_64-apple-darwin` (Intel)
+- **osquery**: Installed via official PKG installer
+- **Features**: System tray, background monitoring
+
+### Linux
+- **Target**: `x86_64-unknown-linux-gnu`
+- **osquery**: Supports apt (Debian/Ubuntu), dnf (Fedora), zypper (SUSE)
+- **Features**: System tray, background monitoring
+
+### Mobile (Tauri 2.0)
+- **iOS**: `aarch64-apple-ios`
+- **Android**: `aarch64-linux-android`
+
+## 📁 Project Structure
+```
+klaayguard/
+├── src-tauri/           # Rust backend (Tauri)
+│   ├── src/
+│   │   ├── lib.rs       # Main application logic
+│   │   ├── main.rs      # Entry point
+│   │   └── osquery/     # osquery installation & management
+│   ├── Cargo.toml       # Rust dependencies
+│   └── tauri.conf.json  # Tauri configuration
+├── src/                 # React frontend
+│   ├── components/      # UI components
+│   ├── pages/          # Application pages
+│   ├── context/        # React context providers
+│   └── constants/      # API configuration
+├── package.json        # Node.js dependencies
+└── vite.config.ts      # Vite configuration
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+```bash
+# .env file
+VITE_API_BASE_URL=https://api.klaay.dev
+```
+
+### API Endpoints
+- **Config**: `GET /klaayguard/config` - Fetch monitoring configuration
+- **Data**: `POST /klaayguard/data` - Submit collected system data
+
+## 🛠️ Development Commands
+
+```bash
+# Development
+yarn dev                 # Start Vite dev server
+yarn tauri dev          # Start Tauri development
+
+# Building
+yarn build              # Build frontend
+yarn tauri build        # Build desktop app
+yarn tauri build --release  # Build optimized release
+
+# Platform-specific builds
+yarn tauri build --target x86_64-pc-windows-msvc
+yarn tauri build --target aarch64-apple-darwin
+yarn tauri build --target x86_64-unknown-linux-gnu
+```
+
+## 🔒 Security Features
+
+- **JWT Authentication**: Secure API communication
+- **System Integration**: Native osquery installation
+- **Background Operation**: System tray with show/hide/quit
+- **Data Encryption**: HTTPS transmission to API
+- **Cross-platform**: Consistent security monitoring across platforms
+
+## 📦 Docker Build (Alternative)
+
+For consistent builds across environments:
+```bash
+# Build using Docker
+docker compose run --rm klaayguard -- yarn run tauri build
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test on target platforms
+5. Submit a pull request
+
+## 📄 License
+
+[Add your license information here]
