@@ -1,6 +1,5 @@
 // src-tauri/src/osquery/install.rs
 use anyhow::{Result};
-use log::{warn, error};
 use runas::Command as SudoCommand;
 use reqwest::blocking::get;
 use std::fs::File;
@@ -9,6 +8,7 @@ use std::io::copy;
 // Progress callback type
 pub type ProgressCallback = dyn Fn(&str, &str);
 
+#[cfg(target_os = "linux")]
 enum LinuxPackageManager {
     Apt,
     Dnf,
@@ -17,6 +17,9 @@ enum LinuxPackageManager {
 
 #[cfg(target_os = "linux")]
 fn get_package_manager() -> Result<LinuxPackageManager> {
+    use log::info;
+    use std::process::Command;
+    
     // debian based
     let apt_installed = Command::new("which")
         .arg("apt")
@@ -55,6 +58,8 @@ fn get_package_manager() -> Result<LinuxPackageManager> {
 
 #[cfg(target_os = "linux")]
 fn configure_osquery_repo(package_manager: &LinuxPackageManager) -> Result<()> {
+    use std::process::Command;
+    
     match package_manager {
         LinuxPackageManager::Apt => {
             Command::new("sudo")
@@ -160,6 +165,9 @@ fn configure_osquery_repo(package_manager: &LinuxPackageManager) -> Result<()> {
 
 #[cfg(target_os = "linux")]
 pub fn install_osquery() -> Result<()> {
+    use log::{info, warn};
+    use std::process::Command;
+    
     info!("Preparing osquery installation on Linux");
 
     let package_manager = get_package_manager()?;
@@ -198,19 +206,11 @@ pub fn install_osquery() -> Result<()> {
             }
             Ok(status) => {
                 last_error = Some(format!("Installation failed with status: {}", status));
-                warn!(
-                    "Attempt {} failed: {}",
-                    attempts,
-                    last_error.as_ref().unwrap()
-                );
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             }
             Err(e) => {
                 last_error = Some(format!("Failed to execute installation command: {}", e));
-                warn!(
-                    "Attempt {} failed: {}",
-                    attempts,
-                    last_error.as_ref().unwrap()
-                );
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             }
         }
 
@@ -417,6 +417,7 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
 #[cfg(target_os = "linux")]
 pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Result<()> {
     use log::{info, warn};
+    use std::process::Command;
     info!("Preparing osquery installation on Linux");
     if let Some(cb) = progress { cb("checking", "Preparing osquery installation on Linux"); }
     let package_manager = get_package_manager().map_err(|e| {

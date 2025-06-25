@@ -1,19 +1,8 @@
 mod osquery;
 use osquery::install;
 use serde_json::Value;
-use std::{
-    collections::HashMap,
-    process::{Command, Stdio},
-};
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent},
-    Manager,
-    AppHandle,
-    Runtime,
-    Manager as _,
-    Window,
-};
+use std::collections::HashMap;
+use tauri::Manager;
 
 use serde::{Deserialize, Serialize};
 
