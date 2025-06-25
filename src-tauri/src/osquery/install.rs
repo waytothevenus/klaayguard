@@ -432,10 +432,15 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
             ])
             .creation_flags(CREATE_NO_WINDOW)
             .status()
-            .context("Failed to install Chocolatey. Try running as Administrator")?;
+            .map_err(|e| {
+                if let Some(cb) = progress {
+                    cb("error", &format!("Network or permission error while installing Chocolatey: {}. Try running as administrator.", e));
+                }
+                anyhow::anyhow!("Network or permission error while installing Chocolatey: {}. Try running as administrator.", e)
+            })?;
         if !status.success() {
-            if let Some(cb) = progress { cb("error", "Chocolatey installation failed"); }
-            return Err(anyhow::anyhow!("Chocolatey installation failed with status: {}", status));
+            if let Some(cb) = progress { cb("error", "Chocolatey installation failed. Try running as administrator."); }
+            return Err(anyhow::anyhow!("Chocolatey installation failed with status: {}. Try running as administrator.", status));
         }
         if let Some(cb) = progress { cb("configuring", "Waiting for Chocolatey to initialize..."); }
         info!("Waiting for Chocolatey to initialize...");
@@ -451,11 +456,16 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
         .arg("--version")
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .context("Failed to verify Chocolatey installation")?;
+        .map_err(|e| {
+            if let Some(cb) = progress {
+                cb("error", &format!("Failed to verify Chocolatey installation: {}. Try running as administrator.", e));
+            }
+            anyhow::anyhow!("Failed to verify Chocolatey installation: {}. Try running as administrator.", e)
+        })?;
     if !choco_version.status.success() {
-        if let Some(cb) = progress { cb("error", "Chocolatey verification failed"); }
+        if let Some(cb) = progress { cb("error", "Chocolatey verification failed. Try running as administrator."); }
         error!("Chocolatey verification failed. Output: {:?}", choco_version);
-        return Err(anyhow::anyhow!("Chocolatey installation verification failed"));
+        return Err(anyhow::anyhow!("Chocolatey installation verification failed. Try running as administrator."));
     }
     info!("Chocolatey version: {}", String::from_utf8_lossy(&choco_version.stdout));
     if let Some(cb) = progress { cb("installing", "Installing osquery via Chocolatey"); }
@@ -482,7 +492,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
                 warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             },
             Err(e) => {
-                last_error = Some(format!("Failed to execute choco command: {}", e));
+                last_error = Some(format!("Failed to execute choco command: {}. Try running as administrator.", e));
                 warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             }
         }
@@ -490,9 +500,9 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/in
             std::thread::sleep(std::time::Duration::from_secs(5));
         }
     }
-    if let Some(cb) = progress { cb("error", "Failed to install osquery after multiple attempts"); }
+    if let Some(cb) = progress { cb("error", &format!("Failed to install osquery after multiple attempts. {}. Try running as administrator.", last_error.clone().unwrap_or_default())); }
     Err(anyhow::anyhow!(
-        "Failed to install osquery after {} attempts. Last error: {}",
+        "Failed to install osquery after {} attempts. Last error: {}. Try running as administrator.",
         max_attempts,
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
@@ -503,11 +513,26 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
     let url = "https://pkg.osquery.io/darwin/osquery-5.17.0.pkg";
     let output_path = "/tmp/osquery-5.17.0.pkg";
     if let Some(cb) = progress { cb("downloading", "Downloading osquery package..."); }
-    let mut response = get(url)?;
+    let mut response = get(url).map_err(|e| {
+        if let Some(cb) = progress {
+            cb("error", &format!("Network error while downloading osquery: {}. Check your internet connection.", e));
+        }
+        anyhow::anyhow!("Network error while downloading osquery: {}. Check your internet connection.", e)
+    })?;
     if response.status().is_success() {
         if let Some(cb) = progress { cb("downloading", "Writing osquery package to disk..."); }
-        let mut out = File::create(output_path)?;
-        copy(&mut response, &mut out)?;
+        let mut out = File::create(output_path).map_err(|e| {
+            if let Some(cb) = progress {
+                cb("error", &format!("Permission error writing to disk: {}. Try running as administrator.", e));
+            }
+            anyhow::anyhow!("Permission error writing to disk: {}. Try running as administrator.", e)
+        })?;
+        copy(&mut response, &mut out).map_err(|e| {
+            if let Some(cb) = progress {
+                cb("error", &format!("Disk write error: {}. Try running as administrator.", e));
+            }
+            anyhow::anyhow!("Disk write error: {}. Try running as administrator.", e)
+        })?;
         if let Some(cb) = progress { cb("installing", "Installing osquery..."); }
         let status = SudoCommand::new("installer")
             .gui(true)
@@ -516,18 +541,24 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
             .arg(output_path)
             .arg("-target")
             .arg("/")
-            .status()?;
+            .status()
+            .map_err(|e| {
+                if let Some(cb) = progress {
+                    cb("error", &format!("Permission error running installer: {}. Try running as administrator.", e));
+                }
+                anyhow::anyhow!("Permission error running installer: {}. Try running as administrator.", e)
+            })?;
         if status.success() {
             if let Some(cb) = progress { cb("done", "osquery installation successful."); }
-            std::fs::remove_file(output_path)?;
+            std::fs::remove_file(output_path).ok();
             Ok(())
         } else {
-            if let Some(cb) = progress { cb("error", "osquery installation failed."); }
-            Err(anyhow::anyhow!("osquery installation failed."))
+            if let Some(cb) = progress { cb("error", "osquery installation failed. Try running as administrator."); }
+            Err(anyhow::anyhow!("osquery installation failed. Try running as administrator."))
         }
     } else {
-        if let Some(cb) = progress { cb("error", "Failed to download osquery package."); }
-        Err(anyhow::anyhow!("Failed to download osquery package."))
+        if let Some(cb) = progress { cb("error", "Failed to download osquery package. Check your internet connection."); }
+        Err(anyhow::anyhow!("Failed to download osquery package. Check your internet connection."))
     }
 }
 
@@ -536,9 +567,19 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
     use log::{info, warn};
     info!("Preparing osquery installation on Linux");
     if let Some(cb) = progress { cb("checking", "Preparing osquery installation on Linux"); }
-    let package_manager = get_package_manager()?;
+    let package_manager = get_package_manager().map_err(|e| {
+        if let Some(cb) = progress {
+            cb("error", &format!("Could not detect supported package manager: {}. Please install apt, dnf, or zypper.", e));
+        }
+        anyhow::anyhow!("Could not detect supported package manager: {}. Please install apt, dnf, or zypper.", e)
+    })?;
     if let Some(cb) = progress { cb("configuring", "Configuring osquery repository"); }
-    configure_osquery_repo(&package_manager)?;
+    configure_osquery_repo(&package_manager).map_err(|e| {
+        if let Some(cb) = progress {
+            cb("error", &format!("Failed to configure osquery repository: {}. Try running as root or with sudo.", e));
+        }
+        anyhow::anyhow!("Failed to configure osquery repository: {}. Try running as root or with sudo.", e)
+    })?;
     let mut attempts = 0;
     let max_attempts = 3;
     let mut last_error = None;
@@ -568,7 +609,7 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
                 warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             }
             Err(e) => {
-                last_error = Some(format!("Failed to execute installation command: {}", e));
+                last_error = Some(format!("Failed to execute installation command: {}. Try running as root or with sudo.", e));
                 warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
             }
         }
@@ -576,9 +617,9 @@ pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Res
             std::thread::sleep(std::time::Duration::from_secs(5));
         }
     }
-    if let Some(cb) = progress { cb("error", "Failed to install osquery after multiple attempts"); }
+    if let Some(cb) = progress { cb("error", &format!("Failed to install osquery after multiple attempts. {}. Try running as root or with sudo.", last_error.clone().unwrap_or_default())); }
     Err(anyhow::anyhow!(
-        "Failed to install osquery after {} attempts. Last error: {}",
+        "Failed to install osquery after {} attempts. Last error: {}. Try running as root or with sudo.",
         max_attempts,
         last_error.unwrap_or_else(|| "unknown error".to_string())
     ))
