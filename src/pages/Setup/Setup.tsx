@@ -1,33 +1,48 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
-type InstallationState = "checking" | "installing" | "success" | "error";
+type InstallationState = "checking" | "downloading" | "installing" | "configuring" | "success" | "done" | "error";
 
 const Setup: React.FC = () => {
   const navigate = useNavigate();
   const [installationState, setInstallationState] = useState<InstallationState>("checking");
+  const [progressMessage, setProgressMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    // Listen for progress events
+    listen<{ stage: string; message: string }>("osquery-install-progress", (event) => {
+      const { stage, message } = event.payload;
+      if (stage === "error") {
+        setInstallationState("error");
+        setErrorMessage(message);
+      } else if (stage === "done" || stage === "success") {
+        setInstallationState("success");
+        setProgressMessage(message);
+        setTimeout(() => {
+          navigate("/signin");
+        }, 2000);
+      } else {
+        setInstallationState(stage as InstallationState);
+        setProgressMessage(message);
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
     handleAutomaticInstallation();
+    return () => {
+      if (unlisten) unlisten();
+    };
   }, []);
 
   const handleAutomaticInstallation = async () => {
     try {
-      setInstallationState("installing");
       setErrorMessage("");
-
-      // Run the automatic installation
+      setProgressMessage("");
       await invoke("auto_install_osquery");
-      
-      setInstallationState("success");
-      
-      // Wait a moment to show success state, then redirect
-      setTimeout(() => {
-        navigate("/signin");
-      }, 2000);
-      
     } catch (error) {
       console.error("Installation failed:", error);
       setInstallationState("error");
@@ -48,7 +63,16 @@ const Setup: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Checking System</h2>
-            <p className="text-gray-600">Verifying osquery installation status...</p>
+            <p className="text-gray-600">{progressMessage || "Verifying osquery installation status..."}</p>
+          </div>
+        );
+
+      case "downloading":
+        return (
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Downloading osquery</h2>
+            <p className="text-gray-600">{progressMessage || "Downloading osquery package..."}</p>
           </div>
         );
 
@@ -57,12 +81,22 @@ const Setup: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Installing osquery</h2>
-            <p className="text-gray-600">Please wait while we install osquery on your system...</p>
+            <p className="text-gray-600">{progressMessage || "Please wait while we install osquery on your system..."}</p>
             <p className="text-sm text-gray-500 mt-2">This may take a few minutes</p>
           </div>
         );
 
+      case "configuring":
+        return (
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Configuring osquery</h2>
+            <p className="text-gray-600">{progressMessage || "Configuring osquery repository..."}</p>
+          </div>
+        );
+
       case "success":
+      case "done":
         return (
           <div className="text-center">
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -71,7 +105,7 @@ const Setup: React.FC = () => {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Installation Complete!</h2>
-            <p className="text-gray-600">osquery has been successfully installed on your system.</p>
+            <p className="text-gray-600">{progressMessage || "osquery has been successfully installed on your system."}</p>
             <p className="text-sm text-gray-500 mt-2">Redirecting to sign in...</p>
           </div>
         );
