@@ -12,7 +12,6 @@ export const Home = () => {
     null
   );
 
-  const [isOsQueryInstalling, setIsOsQueryInstalling] = useState(false);
   interface ConfigData {
     type: string;
     id: string;
@@ -32,7 +31,7 @@ export const Home = () => {
     | { [key: string]: DeepRecord };
 
   const [config, setConfig] = useState<Config | null>(null);
-  const [deviceUUID, setDeviceUUID] = useState<String | null>(null);
+  const [deviceUUID, setDeviceUUID] = useState<string | null>(null);
   const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
 
@@ -70,19 +69,8 @@ export const Home = () => {
     try {
       const installed = await invoke<boolean>("check_osquery");
       setOsqueryInstalled(installed);
-      setIsOsQueryInstalling(false);
     } catch (err) {
       setError(`Error checking installation: ${err}`);
-    }
-  };
-
-  const handleInstall = async () => {
-    try {
-      setIsOsQueryInstalling(true);
-      await invoke("install_osquery");
-      await checkInstallation();
-    } catch (err) {
-      setError(`Installation failed: ${err}`);
     }
   };
 
@@ -149,9 +137,9 @@ export const Home = () => {
     }
   }
 
-  async function get_device_uuid(): Promise<String | null> {
+  async function get_device_uuid(): Promise<string | null> {
     try {
-      const response = await invoke<String>("get_device_uuid");
+      const response = await invoke<string>("get_device_uuid");
       return response;
     } catch(error) { 
       console.error("Error getting device id: ", error);
@@ -201,9 +189,7 @@ export const Home = () => {
         </div>
       )}
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      {isOsQueryInstalling ? (
-        <p className="text-yellow-600 mb-4">Installing osquery...</p>
-      ) : osqueryInstalled === null ? (
+      {osqueryInstalled === null ? (
         <p>Checking osquery installation...</p>
       ) : osqueryInstalled ? (
         <>
@@ -305,12 +291,7 @@ export const Home = () => {
         </>
       ) : (
         <div className="flex justify-center items-center min-h-[200px]">
-          <button
-            onClick={handleInstall}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Install Osquery
-          </button>
+          <p>Osquery is not installed. Please reinstall the application.</p>
         </div>
       )}
     </div>

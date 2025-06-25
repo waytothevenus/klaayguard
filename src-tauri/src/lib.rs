@@ -1,14 +1,25 @@
 mod osquery;
 use osquery::install;
 use serde_json::Value;
-use std::{
-    collections::HashMap,
-};
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent},
-    Manager,
-};
+use std::collections::HashMap;
+use tauri::Manager;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone)]
+struct InstallationStatus {
+    installed: bool,
+    platform: String,
+}
+
+impl Default for InstallationStatus {
+    fn default() -> Self {
+        Self {
+            installed: false,
+            platform: std::env::consts::OS.to_string(),
+        }
+    }
+}
 
 // will return a different id every call if you don't have a hardware id until
 // a build with https://github.com/osquery/osquery/pull/8616 is released
@@ -100,6 +111,60 @@ async fn install_osquery() -> Result<(), String> {
     install::install_osquery().map_err(|e| e.to_string())
 }
 
+fn install_osquery_with_progress<R: tauri::Runtime>(_app: &tauri::AppHandle<R>) -> Result<(), String> {
+    // For now, just call the regular install function
+    // Progress events can be added later when we figure out the correct Tauri 2.0 API
+    match install::install_osquery() {
+        Ok(_) => {
+            Ok(())
+        },
+        Err(e) => {
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn auto_install_osquery<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    let result = install_osquery_with_progress(&app);
+    if result.is_ok() {
+        // Mark installation as complete (simplified approach)
+        Ok(())
+    } else {
+        result
+    }
+}
+
+#[tauri::command]
+async fn is_first_launch() -> Result<bool, String> {
+    // Simplified approach: just check if osquery is installed
+    // If not installed, consider it first launch
+    Ok(!install::is_osquery_installed())
+}
+
+#[tauri::command]
+async fn mark_first_launch_complete() -> Result<(), String> {
+    // Simplified approach: just return success
+    // The actual installation status is checked by is_osquery_installed()
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_installation_status() -> Result<InstallationStatus, String> {
+    let status = InstallationStatus {
+        installed: install::is_osquery_installed(),
+        platform: std::env::consts::OS.to_string(),
+    };
+    Ok(status)
+}
+
+#[tauri::command]
+async fn record_installation_error(_error_message: String) -> Result<(), String> {
+    // Simplified approach: just return success
+    // Error tracking can be implemented later if needed
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -112,11 +177,15 @@ pub fn run() {
                     api.prevent_close();
                 }
             });
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
-            let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i, &show_i, &hide_i])?;
-            TrayIconBuilder::new()
+            
+            // Create tray menu
+            let quit_i = tauri::menu::MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = tauri::menu::MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let hide_i = tauri::menu::MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
+            let menu = tauri::menu::Menu::with_items(app, &[&quit_i, &show_i, &hide_i])?;
+            
+            // Create tray icon
+            tauri::tray::TrayIconBuilder::new()
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -135,10 +204,10 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| match event {
-                    TrayIconEvent::Enter { .. } => {
+                    tauri::tray::TrayIconEvent::Enter { .. } => {
                         tray.set_tooltip(Some("Klaay Guard".to_string())).unwrap();
                     }
-                    TrayIconEvent::Leave { .. } => {
+                    tauri::tray::TrayIconEvent::Leave { .. } => {
                         tray.set_tooltip(Some("")).unwrap();
                     }
                     _ => {}
@@ -154,6 +223,11 @@ pub fn run() {
             install_osquery,
             check_osquery,
             get_device_uuid,
+            is_first_launch,
+            mark_first_launch_complete,
+            auto_install_osquery,
+            get_installation_status,
+            record_installation_error,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
