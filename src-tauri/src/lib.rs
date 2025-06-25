@@ -10,6 +10,8 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
     Manager,
+    AppHandle,
+    Runtime,
 };
 
 // will return a different id every call if you don't have a hardware id until
@@ -102,27 +104,41 @@ async fn install_osquery() -> Result<(), String> {
     install::install_osquery().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn auto_install_osquery() -> Result<(), String> {
-    // First check if osquery is already installed
+fn emit_progress<R: Runtime>(app: &AppHandle<R>, stage: &str, message: &str) {
+    let _ = app.emit_all("osquery-install-progress", serde_json::json!({
+        "stage": stage,
+        "message": message,
+    }));
+}
+
+fn install_osquery_with_progress<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    emit_progress(app, "checking", "Checking if osquery is already installed");
     if install::is_osquery_installed() {
-        // If already installed, just mark first launch as complete
-        mark_first_launch_complete().await?;
+        emit_progress(app, "done", "osquery is already installed");
         return Ok(());
     }
-    
-    // Install osquery
-    install::install_osquery().map_err(|e| e.to_string())?;
-    
-    // Verify installation was successful
-    if !install::is_osquery_installed() {
-        return Err("osquery installation completed but verification failed".to_string());
+
+    emit_progress(app, "downloading", "Downloading osquery");
+    // The install::install_osquery function should emit its own progress events for more granularity
+    match install::install_osquery() {
+        Ok(_) => {
+            emit_progress(app, "done", "osquery installation complete");
+            Ok(())
+        },
+        Err(e) => {
+            emit_progress(app, "error", &format!("osquery installation failed: {}", e));
+            Err(e.to_string())
+        }
     }
-    
-    // Mark first launch as complete
-    mark_first_launch_complete().await?;
-    
-    Ok(())
+}
+
+#[tauri::command]
+async fn auto_install_osquery<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let result = install_osquery_with_progress(&app);
+    if result.is_ok() {
+        mark_first_launch_complete().await?;
+    }
+    result
 }
 
 #[tauri::command]

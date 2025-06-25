@@ -401,3 +401,190 @@ pub fn is_osquery_installed() -> bool {
             .is_ok_and(|status| status.success())
     }
 }
+
+// Progress callback type
+pub type ProgressCallback = dyn Fn(&str, &str);
+
+#[cfg(target_os = "windows")]
+pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Result<()> {
+    use std::os::windows::process::CommandExt;
+    use log::{info, warn, error};
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    if let Some(cb) = progress { cb("checking", "Preparing osquery installation on Windows"); }
+    info!("Preparing osquery installation on Windows");
+    let choco_installed = Command::new("where")
+        .arg("choco")
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok();
+    if !choco_installed {
+        if let Some(cb) = progress { cb("downloading", "Chocolatey not found. Installing Chocolatey first..."); }
+        warn!("Chocolatey not found. Installing Chocolatey first...");
+        let status = Command::new("powershell")
+            .args(&[
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-Command",
+                "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .context("Failed to install Chocolatey. Try running as Administrator")?;
+        if !status.success() {
+            if let Some(cb) = progress { cb("error", "Chocolatey installation failed"); }
+            return Err(anyhow::anyhow!("Chocolatey installation failed with status: {}", status));
+        }
+        if let Some(cb) = progress { cb("configuring", "Waiting for Chocolatey to initialize..."); }
+        info!("Waiting for Chocolatey to initialize...");
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        info!("Refreshing environment variables...");
+        let _ = Command::new("cmd")
+            .args(&["/C", "refreshenv"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+    info!("Verifying Chocolatey installation...");
+    let choco_version = Command::new("choco")
+        .arg("--version")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .context("Failed to verify Chocolatey installation")?;
+    if !choco_version.status.success() {
+        if let Some(cb) = progress { cb("error", "Chocolatey verification failed"); }
+        error!("Chocolatey verification failed. Output: {:?}", choco_version);
+        return Err(anyhow::anyhow!("Chocolatey installation verification failed"));
+    }
+    info!("Chocolatey version: {}", String::from_utf8_lossy(&choco_version.stdout));
+    if let Some(cb) = progress { cb("installing", "Installing osquery via Chocolatey"); }
+    info!("Installing osquery via Chocolatey");
+    let mut attempts = 0;
+    let max_attempts = 3;
+    let mut last_error = None;
+    while attempts < max_attempts {
+        attempts += 1;
+        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
+        if let Some(cb) = progress { cb("installing", &format!("Attempt {} of {} to install osquery", attempts, max_attempts)); }
+        let status = Command::new("choco")
+            .args(&["install", "osquery", "-y", "--force", "--no-progress"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+        match status {
+            Ok(status) if status.success() => {
+                if let Some(cb) = progress { cb("done", "osquery installation completed via Chocolatey"); }
+                info!("osquery installation completed via Chocolatey");
+                return Ok(());
+            },
+            Ok(status) => {
+                last_error = Some(format!("Chocolatey exited with status: {}", status));
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+            },
+            Err(e) => {
+                last_error = Some(format!("Failed to execute choco command: {}", e));
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+            }
+        }
+        if attempts < max_attempts {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
+    }
+    if let Some(cb) = progress { cb("error", "Failed to install osquery after multiple attempts"); }
+    Err(anyhow::anyhow!(
+        "Failed to install osquery after {} attempts. Last error: {}",
+        max_attempts,
+        last_error.unwrap_or_else(|| "unknown error".to_string())
+    ))
+}
+
+#[cfg(target_os = "macos")]
+pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Result<()> {
+    let url = "https://pkg.osquery.io/darwin/osquery-5.17.0.pkg";
+    let output_path = "/tmp/osquery-5.17.0.pkg";
+    if let Some(cb) = progress { cb("downloading", "Downloading osquery package..."); }
+    let mut response = get(url)?;
+    if response.status().is_success() {
+        if let Some(cb) = progress { cb("downloading", "Writing osquery package to disk..."); }
+        let mut out = File::create(output_path)?;
+        copy(&mut response, &mut out)?;
+        if let Some(cb) = progress { cb("installing", "Installing osquery..."); }
+        let status = SudoCommand::new("installer")
+            .gui(true)
+            .force_prompt(true)
+            .arg("-pkg")
+            .arg(output_path)
+            .arg("-target")
+            .arg("/")
+            .status()?;
+        if status.success() {
+            if let Some(cb) = progress { cb("done", "osquery installation successful."); }
+            std::fs::remove_file(output_path)?;
+            Ok(())
+        } else {
+            if let Some(cb) = progress { cb("error", "osquery installation failed."); }
+            Err(anyhow::anyhow!("osquery installation failed."))
+        }
+    } else {
+        if let Some(cb) = progress { cb("error", "Failed to download osquery package."); }
+        Err(anyhow::anyhow!("Failed to download osquery package."))
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn install_osquery_with_progress(progress: Option<&ProgressCallback>) -> Result<()> {
+    use log::{info, warn};
+    info!("Preparing osquery installation on Linux");
+    if let Some(cb) = progress { cb("checking", "Preparing osquery installation on Linux"); }
+    let package_manager = get_package_manager()?;
+    if let Some(cb) = progress { cb("configuring", "Configuring osquery repository"); }
+    configure_osquery_repo(&package_manager)?;
+    let mut attempts = 0;
+    let max_attempts = 3;
+    let mut last_error = None;
+    while attempts < max_attempts {
+        attempts += 1;
+        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
+        if let Some(cb) = progress { cb("installing", &format!("Attempt {} of {} to install osquery", attempts, max_attempts)); }
+        let osquery_install_status = match package_manager {
+            LinuxPackageManager::Apt => Command::new("sudo")
+                .args(&["apt", "install", "-y", "osquery"])
+                .status(),
+            LinuxPackageManager::Dnf => Command::new("sudo")
+                .args(&["yum", "install", "-y", "osquery"])
+                .status(),
+            LinuxPackageManager::Zypper => Command::new("sudo")
+                .args(&["zypper", "--non-interactive", "install", "osquery"])
+                .status(),
+        };
+        match osquery_install_status {
+            Ok(status) if status.success() => {
+                if let Some(cb) = progress { cb("done", "osquery installation completed successfully"); }
+                info!("osquery installation completed successfully");
+                return Ok(());
+            }
+            Ok(status) => {
+                last_error = Some(format!("Installation failed with status: {}", status));
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+            }
+            Err(e) => {
+                last_error = Some(format!("Failed to execute installation command: {}", e));
+                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+            }
+        }
+        if attempts < max_attempts {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        }
+    }
+    if let Some(cb) = progress { cb("error", "Failed to install osquery after multiple attempts"); }
+    Err(anyhow::anyhow!(
+        "Failed to install osquery after {} attempts. Last error: {}",
+        max_attempts,
+        last_error.unwrap_or_else(|| "unknown error".to_string())
+    ))
+}
+
+// Fallback for Tauri command
+pub fn install_osquery() -> Result<()> {
+    install_osquery_with_progress(None)
+}
