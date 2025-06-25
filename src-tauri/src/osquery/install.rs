@@ -117,8 +117,8 @@ pub fn install_osquery() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn install_osquery() -> Result<()> {
-    let url = "https://pkg.osquery.io/darwin/osquery-5.18.1.pkg";
-    let output_path = "/tmp/osquery-5.18.1.pkg";
+    let url = "https://pkg.osquery.io/darwin/osquery-5.17.0.pkg";
+    let output_path = "/tmp/osquery-5.17.0.pkg";
 
     // Download the osquery package
     info!("Downloading osquery package...");
