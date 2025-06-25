@@ -3,6 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+type InstallationStatus = {
+  installed: boolean;
+  timestamp: number;
+  version?: string | null;
+  platform: string;
+  error_count: number;
+  last_error?: string | null;
+};
+
 type InstallationState = "checking" | "downloading" | "installing" | "configuring" | "success" | "done" | "error";
 
 const Setup: React.FC = () => {
@@ -10,6 +19,7 @@ const Setup: React.FC = () => {
   const [installationState, setInstallationState] = useState<InstallationState>("checking");
   const [progressMessage, setProgressMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [status, setStatus] = useState<InstallationStatus | null>(null);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -19,6 +29,7 @@ const Setup: React.FC = () => {
       if (stage === "error") {
         setInstallationState("error");
         setErrorMessage(message);
+        fetchStatus();
       } else if (stage === "done" || stage === "success") {
         setInstallationState("success");
         setProgressMessage(message);
@@ -38,22 +49,50 @@ const Setup: React.FC = () => {
     };
   }, []);
 
+  const fetchStatus = async () => {
+    try {
+      const result = await invoke<InstallationStatus>("get_installation_status");
+      setStatus(result);
+    } catch {
+      setStatus(null);
+    }
+  };
+
   const handleAutomaticInstallation = async () => {
     try {
       setErrorMessage("");
       setProgressMessage("");
+      setStatus(null);
       await invoke("auto_install_osquery");
     } catch (error) {
       console.error("Installation failed:", error);
       setInstallationState("error");
       setErrorMessage(error instanceof Error ? error.message : "Installation failed");
+      fetchStatus();
     }
   };
 
   const handleRetry = () => {
     setInstallationState("checking");
     setErrorMessage("");
+    setStatus(null);
     handleAutomaticInstallation();
+  };
+
+  const renderStatusDetails = () => {
+    if (!status) return null;
+    return (
+      <div className="mt-4 p-3 bg-gray-50 rounded text-left text-xs text-gray-500 border border-gray-200">
+        <div><b>Platform:</b> {status.platform}</div>
+        <div><b>Installed:</b> {status.installed ? "Yes" : "No"}</div>
+        <div><b>Error Count:</b> {status.error_count}</div>
+        {status.last_error && <div><b>Last Error:</b> {status.last_error}</div>}
+        {status.timestamp > 0 && (
+          <div><b>Last Attempt:</b> {new Date(status.timestamp * 1000).toLocaleString()}</div>
+        )}
+        {status.version && <div><b>Version:</b> {status.version}</div>}
+      </div>
+    );
   };
 
   const renderContent = () => {
@@ -120,7 +159,8 @@ const Setup: React.FC = () => {
             </div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Installation Failed</h2>
             <p className="text-gray-600 mb-4">{errorMessage}</p>
-            <div className="space-y-2">
+            {renderStatusDetails()}
+            <div className="space-y-2 mt-4">
               <button
                 onClick={handleRetry}
                 className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
