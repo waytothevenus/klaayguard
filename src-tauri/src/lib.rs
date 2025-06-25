@@ -3,6 +3,8 @@ use osquery::install;
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    path::PathBuf,
+    fs,
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -100,6 +102,37 @@ async fn install_osquery() -> Result<(), String> {
     install::install_osquery().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn is_first_launch() -> Result<bool, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    
+    let klaayguard_dir = home_dir.join(".klaayguard");
+    let first_launch_file = klaayguard_dir.join("first_launch_complete");
+    
+    // Check if the first launch file exists
+    Ok(!first_launch_file.exists())
+}
+
+#[tauri::command]
+async fn mark_first_launch_complete() -> Result<(), String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    
+    let klaayguard_dir = home_dir.join(".klaayguard");
+    let first_launch_file = klaayguard_dir.join("first_launch_complete");
+    
+    // Create directory if it doesn't exist
+    fs::create_dir_all(&klaayguard_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+    
+    // Create the first launch file
+    fs::write(&first_launch_file, "osquery_installed")
+        .map_err(|e| format!("Failed to create first launch file: {}", e))?;
+    
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -154,6 +187,8 @@ pub fn run() {
             install_osquery,
             check_osquery,
             get_device_uuid,
+            is_first_launch,
+            mark_first_launch_complete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -29,6 +29,7 @@ anyhow = "1.0.98"
 log = "0.4.27"
 tauri-plugin-shell = "2"
 uuid = { version = "1.16.0", features = ["v4"] }
+dirs = "5.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winbase", "processenv"] }
