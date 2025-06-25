@@ -1,7 +1,11 @@
 // src-tauri/src/osquery/install.rs
-use anyhow::{Context, Result};
+use anyhow::{Result};
 use std::process::Command;
-use log::{info, warn, error};
+use log::{info};
+use runas::Command as SudoCommand;
+use reqwest::blocking::get;
+use std::fs::File;
+use std::io::copy;
 
 
 #[cfg(target_os = "windows")]
@@ -113,97 +117,42 @@ pub fn install_osquery() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn install_osquery() -> Result<()> {
-    
-    info!("Preparing osquery installation on macOS");
+    let url = "https://pkg.osquery.io/darwin/osquery-5.17.0.pkg";
+    let output_path = "/tmp/osquery-5.17.0.pkg";
 
-    // Check if Homebrew is installed
-    let brew_installed = Command::new("which")
-        .arg("brew")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok();
+    // Download the osquery package
+    info!("Downloading osquery package...");
+    let mut response = get(url)?;
 
-    if !brew_installed {
-        warn!("Homebrew not found. Installing Homebrew first...");
-        
-        // Install Homebrew
-        let status = Command::new("/bin/bash")
-            .arg("-c")
-            .arg("curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | bash")
-            .status()
-            .context("Failed to install Homebrew")?;
+    if response.status().is_success() {
+        // Write the downloaded file to disk
+        let mut out = File::create(output_path)?;
+        copy(&mut response, &mut out)?;
 
-        if !status.success() {
-            return Err(anyhow::anyhow!("Homebrew installation failed with status: {}", status));
+        // Install the package using system command
+        info!("Installing osquery...");
+        let status = SudoCommand::new("installer")
+            .gui(true)
+            .force_prompt(true)
+            .arg("-pkg")
+            .arg(output_path)
+            .arg("-target")
+            .arg("/")
+            .status()?;
+
+        if status.success() {
+            info!("osquery installation successful.");
+        } else {
+            return Err(anyhow::anyhow!("osquery installation failed."));
         }
 
-        info!("Waiting for Homebrew to initialize...");
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        // Clean up by removing the downloaded .pkg file
+        std::fs::remove_file(output_path)?;
 
-        // Add Homebrew to PATH if not already there
-        info!("Ensuring Homebrew is in PATH...");
-        let _ = Command::new("/bin/bash")
-            .arg("-c")
-            .arg("echo 'eval \"$(/opt/homebrew/bin/brew shellenv)\"' >> ~/.zshrc && source ~/.zshrc")
-            .status();
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Failed to download osquery package."))
     }
-
-    // Verify brew is now available
-    info!("Verifying Homebrew installation...");
-    let brew_version = Command::new("brew")
-        .arg("--version")
-        .output()
-        .context("Failed to verify Homebrew installation")?;
-
-    if !brew_version.status.success() {
-        error!("Homebrew verification failed. Output: {:?}", brew_version);
-        return Err(anyhow::anyhow!("Homebrew installation verification failed"));
-    }
-
-    info!("Homebrew version: {}", String::from_utf8_lossy(&brew_version.stdout));
-
-    info!("Installing osquery via Homebrew");
-    
-    // Install osquery with Homebrew with retry logic
-    let mut attempts = 0;
-    let max_attempts = 3;
-    let mut last_error = None;
-
-    while attempts < max_attempts {
-        attempts += 1;
-        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
-
-        let status = Command::new("brew")
-            .env("HOMEBREW_NO_AUTO_UPDATE", "1")
-            .args(&["install", "osquery", "--quiet"])
-            .status();
-
-        match status {
-            Ok(status) if status.success() => {
-                info!("osquery installation completed via Homebrew");
-                return Ok(());
-            },
-            Ok(status) => {
-                last_error = Some(format!("Homebrew exited with status: {}", status));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            },
-            Err(e) => {
-                last_error = Some(format!("Failed to execute brew command: {}", e));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            }
-        }
-
-        if attempts < max_attempts {
-            std::thread::sleep(std::time::Duration::from_secs(5));
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "Failed to install osquery after {} attempts. Last error: {}",
-        max_attempts,
-        last_error.unwrap_or_else(|| "unknown error".to_string())
-    ))
 }
 enum LinuxPackageManager {
     Apt,
