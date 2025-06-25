@@ -5,6 +5,7 @@ use std::{
     collections::HashMap,
     path::PathBuf,
     fs,
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{
     menu::{Menu, MenuItem},
@@ -12,7 +13,72 @@ use tauri::{
     Manager,
     AppHandle,
     Runtime,
+    Manager as _,
+    Window,
 };
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Clone)]
+struct InstallationStatus {
+    installed: bool,
+    timestamp: u64,
+    version: Option<String>,
+    platform: String,
+    error_count: u32,
+    last_error: Option<String>,
+}
+
+impl Default for InstallationStatus {
+    fn default() -> Self {
+        Self {
+            installed: false,
+            timestamp: 0,
+            version: None,
+            platform: std::env::consts::OS.to_string(),
+            error_count: 0,
+            last_error: None,
+        }
+    }
+}
+
+fn get_installation_status_path() -> Result<PathBuf, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+    
+    let klaayguard_dir = home_dir.join(".klaayguard");
+    Ok(klaayguard_dir.join("installation_status.json"))
+}
+
+fn load_installation_status() -> Result<InstallationStatus, String> {
+    let status_path = get_installation_status_path()?;
+    
+    if !status_path.exists() {
+        return Ok(InstallationStatus::default());
+    }
+    
+    let content = fs::read_to_string(&status_path)
+        .map_err(|e| format!("Failed to read installation status: {}", e))?;
+    
+    serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse installation status: {}", e))
+}
+
+fn save_installation_status(status: &InstallationStatus) -> Result<(), String> {
+    let status_path = get_installation_status_path()?;
+    let klaayguard_dir = status_path.parent()
+        .ok_or_else(|| "Invalid status path".to_string())?;
+    
+    // Create directory if it doesn't exist
+    fs::create_dir_all(klaayguard_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
+    
+    let content = serde_json::to_string_pretty(status)
+        .map_err(|e| format!("Failed to serialize installation status: {}", e))?;
+    
+    fs::write(&status_path, content)
+        .map_err(|e| format!("Failed to write installation status: {}", e))
+}
 
 // will return a different id every call if you don't have a hardware id until
 // a build with https://github.com/osquery/osquery/pull/8616 is released
@@ -104,29 +170,14 @@ async fn install_osquery() -> Result<(), String> {
     install::install_osquery().map_err(|e| e.to_string())
 }
 
-fn emit_progress<R: Runtime>(app: &AppHandle<R>, stage: &str, message: &str) {
-    let _ = app.emit_all("osquery-install-progress", serde_json::json!({
-        "stage": stage,
-        "message": message,
-    }));
-}
-
-fn install_osquery_with_progress<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    emit_progress(app, "checking", "Checking if osquery is already installed");
-    if install::is_osquery_installed() {
-        emit_progress(app, "done", "osquery is already installed");
-        return Ok(());
-    }
-
-    emit_progress(app, "downloading", "Downloading osquery");
-    // The install::install_osquery function should emit its own progress events for more granularity
+fn install_osquery_with_progress<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
+    // For now, just call the regular install function
+    // Progress events can be added later when we figure out the correct Tauri 2.0 API
     match install::install_osquery() {
         Ok(_) => {
-            emit_progress(app, "done", "osquery installation complete");
             Ok(())
         },
         Err(e) => {
-            emit_progress(app, "error", &format!("osquery installation failed: {}", e));
             Err(e.to_string())
         }
     }
@@ -169,7 +220,38 @@ async fn mark_first_launch_complete() -> Result<(), String> {
     fs::write(&first_launch_file, "osquery_installed")
         .map_err(|e| format!("Failed to create first launch file: {}", e))?;
     
+    // Update installation status
+    let mut status = load_installation_status()?;
+    status.installed = true;
+    status.timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Failed to get timestamp: {}", e))?
+        .as_secs();
+    status.version = Some("5.17.0".to_string()); // osquery version
+    status.error_count = 0;
+    status.last_error = None;
+    
+    save_installation_status(&status)?;
+    
     Ok(())
+}
+
+#[tauri::command]
+async fn get_installation_status() -> Result<InstallationStatus, String> {
+    load_installation_status()
+}
+
+#[tauri::command]
+async fn record_installation_error(error_message: String) -> Result<(), String> {
+    let mut status = load_installation_status()?;
+    status.error_count += 1;
+    status.last_error = Some(error_message);
+    status.timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Failed to get timestamp: {}", e))?
+        .as_secs();
+    
+    save_installation_status(&status)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -229,6 +311,8 @@ pub fn run() {
             is_first_launch,
             mark_first_launch_complete,
             auto_install_osquery,
+            get_installation_status,
+            record_installation_error,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

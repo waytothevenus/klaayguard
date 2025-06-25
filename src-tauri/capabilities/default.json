@@ -8,6 +8,19 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "shell:default"
+    "shell:default",
+    "fs:default",
+    "fs:read-file",
+    "fs:write-file",
+    "fs:create-dir",
+    "fs:scope",
+    "http:default",
+    "http:request",
+    "http:scope",
+    "path:default",
+    "os:default",
+    "process:default",
+    "process:relaunch",
+    "process:relaunch-deps"
   ]
 }
