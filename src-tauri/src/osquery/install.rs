@@ -163,69 +163,6 @@ fn configure_osquery_repo(package_manager: &LinuxPackageManager) -> Result<()> {
     }
 }
 
-#[cfg(target_os = "linux")]
-pub fn install_osquery() -> Result<()> {
-    use log::{info, warn};
-    use std::process::Command;
-    
-    info!("Preparing osquery installation on Linux");
-
-    let package_manager = get_package_manager()?;
-
-    // Configure the osquery repository before installation
-    configure_osquery_repo(&package_manager)?;
-
-    // Install osquery with retry logic
-    let mut attempts = 0;
-    let max_attempts = 3;
-    let mut last_error = None;
-
-    while attempts < max_attempts {
-        attempts += 1;
-        info!(
-            "Attempt {} of {} to install osquery",
-            attempts, max_attempts
-        );
-
-        let osquery_install_status = match package_manager {
-            LinuxPackageManager::Apt => Command::new("sudo")
-                .args(&["apt", "install", "-y", "osquery"])
-                .status(),
-            LinuxPackageManager::Dnf => Command::new("sudo")
-                .args(&["yum", "install", "-y", "osquery"])
-                .status(),
-            LinuxPackageManager::Zypper => Command::new("sudo")
-                .args(&["zypper", "--non-interactive", "install", "osquery"])
-                .status(),
-        };
-
-        match osquery_install_status {
-            Ok(status) if status.success() => {
-                info!("osquery installation completed successfully");
-                return Ok(());
-            }
-            Ok(status) => {
-                last_error = Some(format!("Installation failed with status: {}", status));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            }
-            Err(e) => {
-                last_error = Some(format!("Failed to execute installation command: {}", e));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            }
-        }
-
-        if attempts < max_attempts {
-            std::thread::sleep(std::time::Duration::from_secs(5));
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "Failed to install osquery after {} attempts. Last error: {}",
-        max_attempts,
-        last_error.unwrap_or_else(|| "unknown error".to_string())
-    ))
-}
-
 pub fn is_osquery_installed() -> bool {
     #[cfg(target_os = "windows")]
     {
