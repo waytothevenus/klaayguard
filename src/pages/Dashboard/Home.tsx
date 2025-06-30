@@ -12,7 +12,6 @@ export const Home = () => {
     null
   );
 
-  const [isOsQueryInstalling, setIsOsQueryInstalling] = useState(false);
   interface ConfigData {
     type: string;
     id: string;
@@ -32,11 +31,18 @@ export const Home = () => {
     | { [key: string]: DeepRecord };
 
   const [config, setConfig] = useState<Config | null>(null);
+  const [deviceUUID, setDeviceUUID] = useState<string | null>(null);
   const [queryResult, setQueryResult] = useState<DeepRecord | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     checkInstallation();
+
+    const getDeviceId = async () => {
+      const uuid = await get_device_uuid();
+      setDeviceUUID(uuid);
+    }
+    getDeviceId();
   }, []);
 
   useEffect(() => {
@@ -63,19 +69,8 @@ export const Home = () => {
     try {
       const installed = await invoke<boolean>("check_osquery");
       setOsqueryInstalled(installed);
-      setIsOsQueryInstalling(false);
     } catch (err) {
       setError(`Error checking installation: ${err}`);
-    }
-  };
-
-  const handleInstall = async () => {
-    try {
-      setIsOsQueryInstalling(true);
-      await invoke("install_osquery");
-      await checkInstallation();
-    } catch (err) {
-      setError(`Installation failed: ${err}`);
     }
   };
 
@@ -106,6 +101,10 @@ export const Home = () => {
   async function postDataToApi() {
     try {
       console.log("Posting data to API...", { queryResult });
+      if (!deviceUUID) {
+        console.error("No device uuid.");
+        return;
+      }
       if (!queryResult) {
         console.error("No data to post.");
         return;
@@ -127,7 +126,7 @@ export const Home = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ data: formattedData }),
+        body: JSON.stringify({ device_uuid: deviceUUID, data: formattedData }),
       });
 
       if (!response.ok) {
@@ -135,6 +134,16 @@ export const Home = () => {
       }
     } catch (err) {
       console.error("Error posting data to API:", err);
+    }
+  }
+
+  async function get_device_uuid(): Promise<string | null> {
+    try {
+      const response = await invoke<string>("get_device_uuid");
+      return response;
+    } catch(error) { 
+      console.error("Error getting device id: ", error);
+      return null;
     }
   }
 
@@ -172,10 +181,15 @@ export const Home = () => {
       <h1 className="text-2xl font-bold text-center text-gray-800 mb-4">
         Welcome to the Klaay Guard
       </h1>
+      {deviceUUID && (
+        <div className="bg-gray-50 border border-gray-200 rounded px-4 py-2 mb-4 mx-auto max-w-lg">
+          <p className="text-sm text-gray-700 text-center">
+            Device ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{deviceUUID}</span>
+          </p>
+        </div>
+      )}
       {error && <p className="text-red-500 mb-4">{error}</p>}
-      {isOsQueryInstalling ? (
-        <p className="text-yellow-600 mb-4">Installing osquery...</p>
-      ) : osqueryInstalled === null ? (
+      {osqueryInstalled === null ? (
         <p>Checking osquery installation...</p>
       ) : osqueryInstalled ? (
         <>
@@ -277,12 +291,7 @@ export const Home = () => {
         </>
       ) : (
         <div className="flex justify-center items-center min-h-[200px]">
-          <button
-            onClick={handleInstall}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-          >
-            Install Osquery
-          </button>
+          <p>Osquery is not installed. Please reinstall the application.</p>
         </div>
       )}
     </div>

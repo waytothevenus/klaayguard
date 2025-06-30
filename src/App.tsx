@@ -4,6 +4,7 @@ import { Home } from "./pages/Dashboard/Home";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastContainer } from "react-toastify";
 import AccountSetup from "./pages/AuthPages/AccountSetup";
+import Setup from "./pages/Setup/Setup";
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/home" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/account-setup" element={<AccountSetup />} />
+          <Route path="/setup" element={<Setup />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

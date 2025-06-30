@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { invoke } from "@tauri-apps/api/core";
 import { API_BASE_URL } from "../constants/api";
 
 type AuthContextType = {
@@ -27,6 +28,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAccountConfigRequired, setIsAccountConfigRequired] = useState(false);
+
+  // Check if this is the first launch and handle osquery installation
+  const checkFirstLaunch = async () => {
+    try {
+      const isFirstLaunch = await invoke<boolean>("is_first_launch");
+      if (isFirstLaunch) {
+        console.log("First launch detected, redirecting to setup");
+        navigate("/setup");
+        return true; // Indicate we're in setup mode
+      }
+      return false; // Not first launch
+    } catch (error) {
+      console.error("Error checking first launch:", error);
+      // If we can't check first launch, continue with normal flow
+      return false;
+    }
+  };
 
   async function checkAuthentication() {
     try {
@@ -120,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
         const user = responseData.included?.[0]?.attributes;
         //
-        const account = decodeTokenManually(jwtToken) as any;
+        const account = decodeTokenManually(jwtToken) as Record<string, unknown>;
 
         console.log("Decoded Account:", account);
 
@@ -153,30 +171,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("jwtToken");
+    const initializeApp = async () => {
+      // First check if this is the first launch
+      const isInSetupMode = await checkFirstLaunch();
+      if (isInSetupMode) {
+        return; // Don't proceed with authentication if we're in setup mode
+      }
 
-    const currentPath = window.location.pathname;
+      const savedToken = localStorage.getItem("jwtToken");
+      const currentPath = window.location.pathname;
 
-    console.log("Account Config Required:", isAccountConfigRequired);
-    if (savedToken) {
-      if (isAccountConfigRequired) {
-        console.log("savedToken", savedToken);
-        setToken(savedToken);
-        setIsAuthenticated(true);
-        if (currentPath == "/signin") {
-          navigate("/account-setup");
+      console.log("Account Config Required:", isAccountConfigRequired);
+      if (savedToken) {
+        if (isAccountConfigRequired) {
+          console.log("savedToken", savedToken);
+          setToken(savedToken);
+          setIsAuthenticated(true);
+          if (currentPath == "/signin") {
+            navigate("/account-setup");
+          }
+        } else {
+          console.log("savedToken", savedToken);
+          setToken(savedToken);
+          setIsAuthenticated(true);
+          if (currentPath == "/signin") {
+            navigate("/home");
+          }
         }
       } else {
-        console.log("savedToken", savedToken);
-        setToken(savedToken);
-        setIsAuthenticated(true);
-        if (currentPath == "/signin") {
-          navigate("/home");
-        }
+        navigate("/signin");
       }
-    } else {
-      navigate("/signin");
-    }
+    };
+
+    initializeApp();
   }, []);
 
   const logout = () => {
