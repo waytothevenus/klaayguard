@@ -1,14 +1,13 @@
 // src-tauri/src/osquery/install.rs
 use anyhow::{Context, Result};
+use log::{error, info, warn};
 use std::process::Command;
-use log::{info, warn, error};
-
 
 #[cfg(target_os = "windows")]
 pub fn install_osquery() -> Result<()> {
+    use log::{error, info, warn};
     use std::os::windows::process::CommandExt;
-    use log::{info, warn, error};
-    
+
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
     info!("Preparing osquery installation on Windows");
@@ -24,7 +23,7 @@ pub fn install_osquery() -> Result<()> {
 
     if !choco_installed {
         warn!("Chocolatey not found. Installing Chocolatey first...");
-        
+
         // Install Chocolatey with admin privileges
         let status = Command::new("powershell")
             .args(&[
@@ -39,7 +38,10 @@ pub fn install_osquery() -> Result<()> {
             .context("Failed to install Chocolatey. Try running as Administrator")?;
 
         if !status.success() {
-            return Err(anyhow::anyhow!("Chocolatey installation failed with status: {}", status));
+            return Err(anyhow::anyhow!(
+                "Chocolatey installation failed with status: {}",
+                status
+            ));
         }
 
         info!("Waiting for Chocolatey to initialize...");
@@ -62,14 +64,22 @@ pub fn install_osquery() -> Result<()> {
         .context("Failed to verify Chocolatey installation")?;
 
     if !choco_version.status.success() {
-        error!("Chocolatey verification failed. Output: {:?}", choco_version);
-        return Err(anyhow::anyhow!("Chocolatey installation verification failed"));
+        error!(
+            "Chocolatey verification failed. Output: {:?}",
+            choco_version
+        );
+        return Err(anyhow::anyhow!(
+            "Chocolatey installation verification failed"
+        ));
     }
 
-    info!("Chocolatey version: {}", String::from_utf8_lossy(&choco_version.stdout));
+    info!(
+        "Chocolatey version: {}",
+        String::from_utf8_lossy(&choco_version.stdout)
+    );
 
     info!("Installing osquery via Chocolatey");
-    
+
     // Install osquery with Chocolatey with retry logic
     let mut attempts = 0;
     let max_attempts = 3;
@@ -77,7 +87,10 @@ pub fn install_osquery() -> Result<()> {
 
     while attempts < max_attempts {
         attempts += 1;
-        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
+        info!(
+            "Attempt {} of {} to install osquery",
+            attempts, max_attempts
+        );
 
         let status = Command::new("choco")
             .args(&["install", "osquery", "-y", "--force", "--no-progress"])
@@ -88,14 +101,22 @@ pub fn install_osquery() -> Result<()> {
             Ok(status) if status.success() => {
                 info!("osquery installation completed via Chocolatey");
                 return Ok(());
-            },
+            }
             Ok(status) => {
                 last_error = Some(format!("Chocolatey exited with status: {}", status));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            },
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
+            }
             Err(e) => {
                 last_error = Some(format!("Failed to execute choco command: {}", e));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
             }
         }
 
@@ -113,7 +134,6 @@ pub fn install_osquery() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 pub fn install_osquery() -> Result<()> {
-    
     info!("Preparing osquery installation on macOS");
 
     // Check if Homebrew is installed
@@ -126,7 +146,7 @@ pub fn install_osquery() -> Result<()> {
 
     if !brew_installed {
         warn!("Homebrew not found. Installing Homebrew first...");
-        
+
         // Install Homebrew
         let status = Command::new("/bin/bash")
             .arg("-c")
@@ -135,7 +155,10 @@ pub fn install_osquery() -> Result<()> {
             .context("Failed to install Homebrew")?;
 
         if !status.success() {
-            return Err(anyhow::anyhow!("Homebrew installation failed with status: {}", status));
+            return Err(anyhow::anyhow!(
+                "Homebrew installation failed with status: {}",
+                status
+            ));
         }
 
         info!("Waiting for Homebrew to initialize...");
@@ -145,7 +168,9 @@ pub fn install_osquery() -> Result<()> {
         info!("Ensuring Homebrew is in PATH...");
         let _ = Command::new("/bin/bash")
             .arg("-c")
-            .arg("echo 'eval \"$(/opt/homebrew/bin/brew shellenv)\"' >> ~/.zshrc && source ~/.zshrc")
+            .arg(
+                "echo 'eval \"$(/opt/homebrew/bin/brew shellenv)\"' >> ~/.zshrc && source ~/.zshrc",
+            )
             .status();
     }
 
@@ -161,10 +186,13 @@ pub fn install_osquery() -> Result<()> {
         return Err(anyhow::anyhow!("Homebrew installation verification failed"));
     }
 
-    info!("Homebrew version: {}", String::from_utf8_lossy(&brew_version.stdout));
+    info!(
+        "Homebrew version: {}",
+        String::from_utf8_lossy(&brew_version.stdout)
+    );
 
     info!("Installing osquery via Homebrew");
-    
+
     // Install osquery with Homebrew with retry logic
     let mut attempts = 0;
     let max_attempts = 3;
@@ -172,7 +200,10 @@ pub fn install_osquery() -> Result<()> {
 
     while attempts < max_attempts {
         attempts += 1;
-        info!("Attempt {} of {} to install osquery", attempts, max_attempts);
+        info!(
+            "Attempt {} of {} to install osquery",
+            attempts, max_attempts
+        );
 
         let status = Command::new("brew")
             .env("HOMEBREW_NO_AUTO_UPDATE", "1")
@@ -183,14 +214,22 @@ pub fn install_osquery() -> Result<()> {
             Ok(status) if status.success() => {
                 info!("osquery installation completed via Homebrew");
                 return Ok(());
-            },
+            }
             Ok(status) => {
                 last_error = Some(format!("Homebrew exited with status: {}", status));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
-            },
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
+            }
             Err(e) => {
                 last_error = Some(format!("Failed to execute brew command: {}", e));
-                warn!("Attempt {} failed: {}", attempts, last_error.as_ref().unwrap());
+                warn!(
+                    "Attempt {} failed: {}",
+                    attempts,
+                    last_error.as_ref().unwrap()
+                );
             }
         }
 
@@ -225,7 +264,7 @@ fn get_package_manager() -> Result<LinuxPackageManager> {
     }
 
     // fedora based
-    let dnf_installed= Command::new("which")
+    let dnf_installed = Command::new("which")
         .arg("dnf")
         .status()
         .map(|s| s.success())
@@ -236,7 +275,7 @@ fn get_package_manager() -> Result<LinuxPackageManager> {
     }
 
     // suse based
-    let zypper_installed= Command::new("which")
+    let zypper_installed = Command::new("which")
         .arg("zypper")
         .status()
         .map(|s| s.success())
@@ -429,11 +468,11 @@ pub fn is_osquery_installed() -> bool {
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         const DETACHED_PROCESS: u32 = 0x00000008;
         const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        
+
         // Combine multiple flags for maximum suppression
         let flags = CREATE_NO_WINDOW | DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
-        
-        std::process::Command::new("where")  // First check if osqueryi exists in PATH
+
+        std::process::Command::new("where") // First check if osqueryi exists in PATH
             .arg("osqueryi")
             .creation_flags(flags)
             .stdout(std::process::Stdio::null())
@@ -441,7 +480,7 @@ pub fn is_osquery_installed() -> bool {
             .status()
             .is_ok_and(|status| status.success())
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         std::process::Command::new("which")
