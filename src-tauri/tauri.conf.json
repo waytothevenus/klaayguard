@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk4QUFCNjRDNTBFQUVGOUQKUldTZDcrcFFUTGFxbUxiaDRtZlNUY0VKWmo2cDU1MEY5RnVRTFZIbWpMNVNPMGFjenpOUC9XMUoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZDQzk2QkRCQzlCMjYyMzMKUldRellyTEoyMnZKYkFMaVh2U0pzN04yb0VhKzhCdzVENU9TMHhGTklrbUo5cWFhSEpQRXVib20K",
       "endpoints": [
         "https://github.com/klaayinc/klaayguard/releases/latest/download/latest.json"
       ],
