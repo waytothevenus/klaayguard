@@ -38,7 +38,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY3RTgyRDYwOTYzOUFDMkQKUldRdHJEbVdZQzNvOS9sb3RUMXpvakR0YmEzeHp4V1J1S1R6OHlMdHhKTmcwRHd5Q1o0OWx1TnYK",
       "endpoints": [
-        "https://github.com/klaayinc/klaayguard/releases/latest/download/latest.json"
+        "https://github.com/klaayinc/klaayguard/releases/download/untagged-fd029c80ee3fa0598831/latest.json"
       ],
       "windows": {
         "installMode": "passive"
