@@ -1,38 +1,56 @@
-# KlaayGuard
+# 🧭 KlaayGuard [Project ID: P-KG-001]
 
-[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-FFC131.svg?logo=tauri)](https://tauri.app)
+A cross-platform desktop security monitoring application that collects system information using osquery and reports it to a centralized API for comprehensive security analysis.
 
-**KlaayGuard** is a cross-platform desktop security monitoring application that collects system information using osquery and reports it to a centralized API for security analysis.
+---
 
-## 🎯 Purpose
+## 📚 Table of Contents
 
-KlaayGuard automatically:
-- Installs and manages osquery on Windows, macOS, and Linux
-- Collects system security data (processes, network connections, installed software, etc.)
-- Reports data to `https://api.klaay.dev` every 15 minutes
-- Runs as a system tray application for background monitoring
-- Provides authentication and secure data transmission
+- [About](#about)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Screenshots](#screenshots)
+- [Contact](#contact)
 
-## 🚀 Quick Start
+---
 
-## Downloading a precompiled dev build (Mac)
+## 🧩 About
 
-1. navigate to https://github.com/klaayinc/klaayguard/releases
+KlaayGuard is designed to provide enterprise-grade security monitoring for cross-platform desktop environments. It addresses the challenge of centralized security data collection and analysis by automatically managing osquery installations and transmitting security telemetry to a centralized monitoring platform.
 
-2. look for the most recent "dev" release
+> This project provides an automated security monitoring solution that runs silently in the background, collecting critical system information and reporting it to `https://api.klaay.dev` for real-time security analysis and threat detection.
 
-3. download the appropriate package, this will probably be klaay_XXX_aarch64.dmg for apple silicon macs
+---
 
-4. install the package
+## ✨ Features
 
-## Compile dev build (Linux)
-1. clone the repo:
-   ```bash
-   git clone https://github.com/klaayinc/klaayguard.git
-   cd klaayguard
-   ```
+- **Automated osquery Management** – Automatically installs and configures osquery on Windows, macOS, and Linux
+- **Comprehensive Security Data Collection** – Monitors processes, network connections, installed software, and system configurations
+- **Periodic Reporting** – Transmits security data to the central API every 15 minutes
+- **System Tray Application** – Runs unobtrusively in the background with minimal user interaction
+- **Secure Authentication** – Provides secure user authentication and encrypted data transmission
+- **Cross-Platform Support** – Native desktop application for Windows, macOS, and Linux
+
+---
+
+## 🧠 Tech Stack
+
+**Languages:** TypeScript, Rust  
+**Frontend Framework:** React 18  
+**Desktop Framework:** Tauri 2.x  
+**UI Styling:** TailwindCSS  
+**Security Engine:** osquery  
+**Build Tools:** Vite, Cargo  
+**Additional Libraries:** React Router, React Icons, ApexCharts, FullCalendar
+
+---
+
+## ⚙️ Installation
 
 ### Prerequisites
+
 ```bash
 # Install Node.js (v22+ recommended)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
@@ -51,8 +69,9 @@ npm install -g yarn
 ```
 
 ### Setup & Development
+
 ```bash
-# Clone and setup
+# Clone the repository
 git clone https://github.com/klaayinc/klaayguard.git
 cd klaayguard
 
@@ -61,12 +80,23 @@ yarn install
 
 # Create environment file
 echo "VITE_API_BASE_URL=https://api.klaay.dev" > .env
+```
 
-# Run in development
+---
+
+## 🚀 Usage
+
+### Development Mode
+
+```bash
+# Start the development server
 yarn tauri dev
 ```
 
-### Build for Production
+The application will launch as a desktop app with hot-reload enabled for development.
+
+### Production Build
+
 ```bash
 # Build for current platform
 yarn tauri build
@@ -78,90 +108,65 @@ yarn tauri build --target x86_64-apple-darwin       # macOS Intel
 yarn tauri build --target x86_64-unknown-linux-gnu  # Linux
 ```
 
-## 🏗️ Multi-Platform Support
+### Downloading Precompiled Builds (Mac)
 
-### Windows
-- **Target**: `x86_64-pc-windows-msvc`
-- **osquery**: Installed via Chocolatey package manager
-- **Features**: System tray, background monitoring
+1. Navigate to [https://github.com/klaayinc/klaayguard/releases](https://github.com/klaayinc/klaayguard/releases)
+2. Look for the most recent "dev" release
+3. Download the appropriate package (e.g., `klaay_XXX_aarch64.dmg` for Apple Silicon Macs)
+4. Install the package
 
-### macOS
-- **Targets**: `aarch64-apple-darwin` (Apple Silicon), `x86_64-apple-darwin` (Intel)
-- **osquery**: Installed via official PKG installer
-- **Features**: System tray, background monitoring
+---
 
-### Linux
-- **Target**: `x86_64-unknown-linux-gnu`
-- **osquery**: Supports apt (Debian/Ubuntu), dnf (Fedora), zypper (SUSE)
-- **Features**: System tray, background monitoring
-
-### Mobile (Tauri 2.0)
-- **iOS**: `aarch64-apple-ios`
-- **Android**: `aarch64-linux-android`
-
-## 📁 Project Structure
-```
-klaayguard/
-├── src-tauri/           # Rust backend (Tauri)
-│   ├── src/
-│   │   ├── lib.rs       # Main application logic
-│   │   ├── main.rs      # Entry point
-│   │   └── osquery/     # osquery installation & management
-│   ├── Cargo.toml       # Rust dependencies
-│   └── tauri.conf.json  # Tauri configuration
-├── src/                 # React frontend
-│   ├── components/      # UI components
-│   ├── pages/          # Application pages
-│   ├── context/        # React context providers
-│   └── constants/      # API configuration
-├── package.json        # Node.js dependencies
-└── vite.config.ts      # Vite configuration
-```
-
-## 🔧 Configuration
+## 🧾 Configuration
 
 ### Environment Variables
-```bash
-# .env file
+
+Create a `.env` file with:
+
+```
 VITE_API_BASE_URL=https://api.klaay.dev
 ```
 
 ### API Endpoints
-- **Config**: `GET /klaayguard/config` - Fetch monitoring configuration
-- **Data**: `POST /klaayguard/data` - Submit collected system data
 
-## 🛠️ Development Commands
+The application communicates with the following endpoints:
 
-```bash
-# Development
-yarn dev                 # Start Vite dev server
-yarn tauri dev          # Start Tauri development
+- `GET /klaayguard/config` – Fetch monitoring configuration
+- `POST /klaayguard/data` – Submit collected system data
 
-# Building
-yarn build              # Build frontend
-yarn tauri build        # Build desktop app
-yarn tauri build --release  # Build optimized release
+---
 
-# Platform-specific builds
-yarn tauri build --target x86_64-pc-windows-msvc
-yarn tauri build --target aarch64-apple-darwin
-yarn tauri build --target x86_64-unknown-linux-gnu
-```
+## 🖼 Screenshots
 
-## 🔒 Security Features
+_Screenshots and demo GIFs will be added soon._
 
-- **JWT Authentication**: Secure API communication
-- **System Integration**: Native osquery installation
-- **Background Operation**: System tray with show/hide/quit
-- **Data Encryption**: HTTPS transmission to API
-- **Cross-platform**: Consistent security monitoring across platforms
+---
 
-## 📦 Docker Build (Alternative)
+## 📬 Contact
 
-For consistent builds across environments:
-```bash
+**Author** Yu Du Song
+**email** andyhung772@gmail.com
+**Organization:** Klaay Inc.  
+**GitHub:** [@klaayinc](https://github.com/waytothevenus)  
+**API Endpoint:** [https://api.klaay.dev](https://api.klaay.dev)
+
+---
+
+## 🌟 Acknowledgements
+
+- [Tauri](https://tauri.app) – Cross-platform desktop application framework
+- [osquery](https://osquery.io) – SQL-powered operating system instrumentation and monitoring
+- [React](https://react.dev) – UI library for building the frontend
+- [TailwindCSS](https://tailwindcss.com) – Utility-first CSS framework
+
+---
+
+[![Built with Tauri](https://img.shields.io/badge/built%20with-Tauri-FFC131.svg?logo=tauri)](https://tauri.app)
+
 # Build using Docker
+
 docker compose run --rm klaayguard -- yarn run tauri build
+
 ```
 
 ## 🤝 Contributing
@@ -175,3 +180,4 @@ docker compose run --rm klaayguard -- yarn run tauri build
 ## 📄 License
 
 [Add your license information here]
+```
